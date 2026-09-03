@@ -1,0 +1,32 @@
+name: waccon-io
+
+on:
+  push:
+    paths:
+      - 'Waccon/waccon-io/**'
+      - 'Waccon/.github/workflows/waccon-io.yml'
+  pull_request:
+    paths:
+      - 'Waccon/waccon-io/**'
+      - 'Waccon/.github/workflows/waccon-io.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Waccon/waccon-io
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install Meson and Ninja
+        run: python -m pip install meson ninja
+      - name: Configure
+        run: meson setup build --backend ninja --buildtype debug
+      - name: Build
+        run: meson compile -C build
+      - name: Test
+        run: meson test -C build --print-errorlogs
