@@ -8,6 +8,7 @@ waccon_io_lib = shared_library(
     sources : [
         'src/mercuryio.c',
         'include/waccon/mercuryio.h',
+        'include/waccon/shared_memory.h',
         'src/waccon_state.c',
         'src/waccon_state.h',
     ],
