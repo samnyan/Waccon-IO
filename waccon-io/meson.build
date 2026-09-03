@@ -11,6 +11,8 @@ waccon_io_lib = shared_library(
         'include/waccon/shared_memory.h',
         'src/waccon_state.c',
         'src/waccon_state.h',
+        'src/waccon_touch.c',
+        'src/waccon_touch.h',
     ],
     include_directories : inc,
     vs_module_defs : 'waccon_io.def',
@@ -24,6 +26,8 @@ test_exe = executable(
         'tests/test_state.c',
         'src/waccon_state.c',
         'src/waccon_state.h',
+        'src/waccon_touch.c',
+        'src/waccon_touch.h',
     ],
     include_directories : [inc, include_directories('src')],
 )

@@ -3,10 +3,47 @@
 
 #include "waccon/mercuryio.h"
 #include "waccon_state.h"
+#include "waccon_touch.h"
 
 static struct waccon_state waccon;
+static struct waccon_touch_backend touch_backend;
+static struct waccon_touch_mapping touch_mapping = {
+    .left = 0,
+    .top = 0,
+    .width = 1,
+    .height = 1,
+    .center_x = 0.48f,
+    .center_y = 0.50f,
+    .radius = 0.47f,
+    .inner_radius = 0.08f,
+    .start_angle = -1.5707963f,
+    .end_angle = 4.7123890f,
+    .side = 0,
+    .reverse = 0,
+};
+static HWND game_window;
 static HANDLE touch_thread;
 static bool touch_cells[WACCON_IO_TOUCH_CELLS];
+
+static HWND waccon_find_window(void)
+{
+    HWND hwnd = FindWindowW(NULL, L"Mercury  ");
+    if (hwnd == NULL) hwnd = FindWindowW(NULL, L"WACCA");
+    return hwnd;
+}
+
+static void waccon_ensure_touch_window(void)
+{
+    RECT rect;
+    if (touch_backend.attached) return;
+    if (game_window == NULL) game_window = waccon_find_window();
+    if (game_window == NULL || !GetClientRect(game_window, &rect)) return;
+    touch_mapping.width = rect.right - rect.left;
+    touch_mapping.height = rect.bottom - rect.top;
+    if (SUCCEEDED(waccon_touch_attach(&touch_backend, game_window, &touch_mapping))) {
+        waccon_touch_poll(&touch_backend, touch_cells);
+    }
+}
 
 static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
 {
@@ -39,6 +76,9 @@ HRESULT mercury_io_init(void)
 HRESULT mercury_io_poll(void)
 {
     waccon_state_poll(&waccon);
+    waccon_ensure_touch_window();
+    if (touch_backend.attached) waccon_touch_poll(&touch_backend, touch_cells);
+    else if (game_window != NULL) waccon_mouse_poll(game_window, touch_cells);
     return S_OK;
 }
 
