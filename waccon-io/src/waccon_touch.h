@@ -47,6 +47,7 @@ struct waccon_touch_backend {
 
 bool waccon_touch_mapping_contains(const struct waccon_touch_mapping *mapping, float x, float y);
 int waccon_touch_mapping_cell(const struct waccon_touch_mapping *mapping, float x, float y);
+void waccon_touch_mapping_config_load(struct waccon_touch_mapping *mapping, const wchar_t *filename);
 void waccon_touch_clear(struct waccon_touch_backend *backend);
 HRESULT waccon_touch_attach(struct waccon_touch_backend *backend, HWND hwnd, const struct waccon_touch_mapping *mapping);
 void waccon_touch_detach(struct waccon_touch_backend *backend);

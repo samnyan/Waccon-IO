@@ -9,3 +9,13 @@ cursor=1
 wintouch=1
 ; Enable left-button mouse fallback. Default: 1.
 mouse=1
+; Circle center as a fraction of the game client width and height. Default: 0.50, 0.50.
+centerX=0.50
+centerY=0.50
+; Ring radii relative to half of the shorter client edge. Defaults: 1.00, 0.60.
+radius=1.00
+innerRadius=0.60
+; Topmost cell's starting angle in degrees. Default: -90.
+startAngle=-90
+; Reverse cells from top to bottom on both sides. Default: 0.
+reverse=0

@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <wchar.h>
 
 #include "waccon/shared_memory.h"
 #include "waccon/mercuryio.h"
@@ -18,9 +19,12 @@ int main(void)
         .center_y = 0.5f,
         .radius = 1.0f,
         .inner_radius = 0.6f,
+        .start_angle = -1.570796327f,
+        .end_angle = 1.570796327f,
     };
     uint8_t opbtn = 0;
     uint8_t gamebtn = 0;
+    wchar_t temporary_path[MAX_PATH];
 
     assert(sizeof(struct waccon_shm_input) == 262);
     assert(sizeof(struct waccon_shm_output) == 1932);
@@ -56,6 +60,24 @@ int main(void)
     assert(waccon_touch_mapping_cell(&mapping, 0.9f, 0.5f) == 75);
     assert(waccon_touch_mapping_cell(&mapping, 0.1f, 0.5f) == 195);
     assert(waccon_touch_mapping_cell(&mapping, 0.5f, 0.1f) == -1);
+
+
+    assert(GetTempPathW(_countof(temporary_path), temporary_path) > 0);
+    assert(GetTempFileNameW(temporary_path, L"wcc", 0, temporary_path) != 0);
+    assert(WritePrivateProfileStringW(L"waccon", L"centerX", L"0.48", temporary_path));
+    assert(WritePrivateProfileStringW(L"waccon", L"centerY", L"0.47", temporary_path));
+    assert(WritePrivateProfileStringW(L"waccon", L"radius", L"1.05", temporary_path));
+    assert(WritePrivateProfileStringW(L"waccon", L"innerRadius", L"0.58", temporary_path));
+    assert(WritePrivateProfileStringW(L"waccon", L"startAngle", L"-84", temporary_path));
+    assert(WritePrivateProfileStringW(L"waccon", L"reverse", L"1", temporary_path));
+    waccon_touch_mapping_config_load(&mapping, temporary_path);
+    assert(mapping.center_x == 0.48f);
+    assert(mapping.center_y == 0.47f);
+    assert(mapping.radius == 1.05f);
+    assert(mapping.inner_radius == 0.58f);
+    assert(mapping.reverse == 1);
+    assert(mapping.start_angle < -1.46f && mapping.start_angle > -1.47f);
+    DeleteFileW(temporary_path);
 
     waccon_state_destroy(&state);
     return 0;

@@ -46,6 +46,10 @@ static void waccon_load_config(void)
     waccon_log_open_console(console_enabled);
     waccon_log("config debug=%d console=%d cursor=%d wintouch=%d mouse=%d\n",
         debug_enabled, console_enabled, cursor_enabled, wintouch_enabled, mouse_enabled);
+    waccon_touch_mapping_config_load(&touch_mapping, L".\\segatools.ini");
+    waccon_log("touch mapping center=(%.3f,%.3f) radius=%.3f innerRadius=%.3f startAngle=%.1f reverse=%u\n",
+        touch_mapping.center_x, touch_mapping.center_y, touch_mapping.radius,
+        touch_mapping.inner_radius, touch_mapping.start_angle * 57.295779513f, touch_mapping.reverse);
     waccon_io4_config_load(&io4_config, L".\\segatools.ini");
     waccon_log("io4 keys test=0x%02X service=0x%02X coin=0x%02X volup=0x%02X voldown=0x%02X\n",
         io4_config.vk_test, io4_config.vk_service, io4_config.vk_coin,

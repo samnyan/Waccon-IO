@@ -8,6 +8,59 @@
 static struct waccon_touch_backend *active_backend;
 static struct waccon_touch_mapping active_mapping;
 
+static void waccon_touch_update_client_size(HWND hwnd)
+{
+    RECT rect;
+    int32_t width;
+    int32_t height;
+
+    if (active_backend == NULL || !active_backend->attached || !GetClientRect(hwnd, &rect)) return;
+    width = rect.right - rect.left;
+    height = rect.bottom - rect.top;
+    if (width <= 0 || height <= 0) return;
+    EnterCriticalSection(&active_backend->lock);
+    active_mapping.width = width;
+    active_mapping.height = height;
+    LeaveCriticalSection(&active_backend->lock);
+    waccon_log("touch mapping resized client=%ldx%ld\n", width, height);
+}
+
+static float waccon_config_float(const wchar_t *key, float fallback, const wchar_t *filename)
+{
+    wchar_t value[64];
+    wchar_t *end;
+    float parsed;
+
+    if (GetPrivateProfileStringW(L"waccon", key, L"", value, _countof(value), filename) == 0) return fallback;
+    parsed = wcstof(value, &end);
+    if (end == value || *end != L'\0') return fallback;
+    return parsed;
+}
+
+void waccon_touch_mapping_config_load(struct waccon_touch_mapping *mapping, const wchar_t *filename)
+{
+    float center_x;
+    float center_y;
+    float radius;
+    float inner_radius;
+    float start_angle;
+
+    if (mapping == NULL || filename == NULL) return;
+    center_x = waccon_config_float(L"centerX", mapping->center_x, filename);
+    center_y = waccon_config_float(L"centerY", mapping->center_y, filename);
+    radius = waccon_config_float(L"radius", mapping->radius, filename);
+    inner_radius = waccon_config_float(L"innerRadius", mapping->inner_radius, filename);
+    start_angle = waccon_config_float(L"startAngle", mapping->start_angle * 57.295779513f, filename);
+
+    if (center_x >= 0.0f && center_x <= 1.0f) mapping->center_x = center_x;
+    if (center_y >= 0.0f && center_y <= 1.0f) mapping->center_y = center_y;
+    if (radius > 0.0f && radius <= 2.0f) mapping->radius = radius;
+    if (inner_radius >= 0.0f && inner_radius < mapping->radius) mapping->inner_radius = inner_radius;
+    if (start_angle >= -180.0f && start_angle <= 0.0f) mapping->start_angle = start_angle * 0.01745329252f;
+    mapping->end_angle = mapping->start_angle + 3.141592654f;
+    mapping->reverse = GetPrivateProfileIntW(L"waccon", L"reverse", mapping->reverse, filename) != 0;
+}
+
 static float waccon_touch_mapping_distance(const struct waccon_touch_mapping *mapping, float x, float y)
 {
     float base_radius;
@@ -44,7 +97,8 @@ int waccon_touch_mapping_cell(const struct waccon_touch_mapping *mapping, float 
     if (dx == 0.0f) return -1;
     distance = waccon_touch_mapping_distance(mapping, x, y);
     angle = atan2f(dy, fabsf(dx));
-    sector = (int)((angle + 1.570796327f) / (3.141592654f / 30.0f));
+    sector = (int)((angle - mapping->start_angle) /
+        ((mapping->end_angle - mapping->start_angle) / 30.0f));
     if (sector < 0) sector = 0;
     if (sector > 29) sector = 29;
     ring = (int)(((distance - mapping->inner_radius) /
@@ -106,6 +160,9 @@ static void waccon_touch_update(const TOUCHINPUT *input)
 
 LRESULT CALLBACK waccon_touch_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
+    if (msg == WM_SIZE && active_backend != NULL && active_backend->attached) {
+        waccon_touch_update_client_size(hwnd);
+    }
     if (msg == WM_TOUCH && active_backend != NULL && active_backend->attached) {
         UINT count = LOWORD(wparam);
         waccon_log_window_event("WM_TOUCH", hwnd, msg, -1, -1);

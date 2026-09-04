@@ -54,6 +54,8 @@ mouse=1     ; enable left-button mouse fallback (default 1)
 
 Touch input uses the same in-window layout as `toucca/web`: the client area's centered circle is split into two sides, with four radial rings and 30 cells per side/ring. The usable ring spans 60% through 100% of the largest circle that fits inside the client area, so no touch cells are mapped outside the game image.
 
+Tune that ring under `[waccon]` with `centerX`, `centerY`, `radius`, `innerRadius`, `startAngle`, and `reverse`. `centerX` and `centerY` are fractions of the client width and height. The radii are multiples of half the shorter client edge: on a 1080x1920 window, `radius=1.00` is 540 pixels and `innerRadius=0.60` is 324 pixels. `startAngle=-90` makes the uppermost cell the first cell on each side.
+
 The standard segatools `[io4]` keyboard bindings are also supported directly by this DLL. They are sampled when the game reads the operator or game buttons, so they do not depend on `mercury_io_poll()` being called:
 
 ```ini
