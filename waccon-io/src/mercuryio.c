@@ -4,6 +4,7 @@
 #include "waccon/mercuryio.h"
 #include "waccon_state.h"
 #include "waccon_touch.h"
+#include "waccon_cursor_hook.h"
 #include "waccon_log.h"
 #include "waccon_io4.h"
 
@@ -103,35 +104,8 @@ static HWND waccon_find_window(void)
     return hwnd;
 }
 
-static void waccon_cursor_update(void)
-{
-    CURSORINFO info;
-    HCURSOR cursor;
-    int old_show_count = -1;
-    int attempts = 0;
-    int show_count = -1;
-
-    if (!cursor_enabled) return;
-    info.cbSize = sizeof(info);
-    if (!GetCursorInfo(&info)) {
-        waccon_log("cursor GetCursorInfo failed error=%lu\n", GetLastError());
-        return;
-    }
-    if ((info.flags & CURSOR_SHOWING) == 0) {
-        for (attempts = 0; attempts < 16; attempts++) {
-            old_show_count = show_count;
-            show_count = ShowCursor(TRUE);
-            if (show_count >= 0) break;
-        }
-        waccon_log("cursor was hidden, ShowCursor(TRUE) old=%d new=%d attempts=%d\n", old_show_count, show_count, attempts + 1);
-    }
-    cursor = LoadCursorW(NULL, MAKEINTRESOURCEW(32512));
-    if (cursor != NULL) SetCursor(cursor);
-}
-
 static uint32_t window_scan_attempts;
 static uint64_t last_window_scan_ms;
-static uint64_t last_cursor_update_ms;
 
 static void waccon_refresh_input(void)
 {
@@ -192,17 +166,6 @@ static void waccon_ensure_game_window(void)
     }
 }
 
-static void waccon_ensure_cursor(void)
-{
-    uint64_t now;
-
-    if (game_window == NULL || !cursor_enabled) return;
-    now = GetTickCount64();
-    if (now - last_cursor_update_ms < 16) return;
-    last_cursor_update_ms = now;
-    waccon_cursor_update();
-}
-
 static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
 {
     struct waccon_state *state = ctx;
@@ -214,7 +177,6 @@ static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
         LeaveCriticalSection(&state->touch_lock);
         if (InterlockedCompareExchange(&state->touch_stop, 0, 0) != 0) break;
         waccon_ensure_game_window();
-        waccon_ensure_cursor();
         waccon_collect_touch_cells(callback_cells);
         if (callback != NULL) callback(callback_cells);
         Sleep(1);
@@ -235,6 +197,8 @@ HRESULT mercury_io_init(void)
     if (InterlockedCompareExchange(&initialized, 1, 0) == 0) {
         waccon_log("mercury_io_init entered, pid=%lu\n", GetCurrentProcessId());
         waccon_load_config();
+        waccon_cursor_hook_set_enabled(cursor_enabled);
+        waccon_cursor_hook_install();
         waccon_state_init(&waccon);
         memset(touch_cells, 0, sizeof(touch_cells));
     }
@@ -257,7 +221,6 @@ HRESULT mercury_io_poll(void)
     }
     waccon_ensure_game_window();
     waccon_collect_touch_cells(touch_cells);
-    waccon_ensure_cursor();
     if (now - last_log >= 1000) {
         waccon_log("poll alive hwnd=%p wintouch_attached=%d cursor=%d\n", game_window, touch_backend.attached, cursor_enabled);
         last_log = now;

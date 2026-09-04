@@ -11,6 +11,8 @@ waccon_io_lib = shared_library(
         'include/waccon/shared_memory.h',
         'src/waccon_state.c',
         'src/waccon_state.h',
+        'src/waccon_cursor_hook.c',
+        'src/waccon_cursor_hook.h',
         'src/waccon_io4.c',
         'src/waccon_io4.h',
         'src/waccon_log.c',
