@@ -1,6 +1,8 @@
 /build*/
 /.vs/
 /out/
+**/bin/
+**/obj/
 *.user
 *.suo
 *.VC.db
