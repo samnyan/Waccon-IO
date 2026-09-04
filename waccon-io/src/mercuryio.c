@@ -132,11 +132,17 @@ static void waccon_cursor_update(void)
 static uint32_t window_scan_attempts;
 static uint64_t last_window_scan_ms;
 
+static void waccon_refresh_input(void)
+{
+    waccon_state_poll(&waccon);
+}
+
 static void waccon_collect_touch_cells(bool cells[WACCON_IO_TOUCH_CELLS])
 {
     bool local_cells[WACCON_IO_TOUCH_CELLS];
     size_t i;
 
+    waccon_refresh_input();
     waccon_state_get_touch(&waccon, cells);
     if (touch_backend.attached && wintouch_enabled) {
         waccon_touch_poll(&touch_backend, local_cells);
@@ -226,7 +232,6 @@ HRESULT mercury_io_poll(void)
     uint8_t keyboard_opbtn;
     uint8_t keyboard_gamebtn;
     uint64_t now = GetTickCount64();
-    waccon_state_poll(&waccon);
     waccon_io4_poll(&io4_config, &keyboard_opbtn, &keyboard_gamebtn);
     if (keyboard_opbtn != last_keyboard_opbtn || keyboard_gamebtn != last_keyboard_gamebtn) {
         waccon_log("io4 keyboard opbtn=0x%02X gamebtn=0x%02X\n", keyboard_opbtn, keyboard_gamebtn);
@@ -247,6 +252,7 @@ void mercury_io_get_opbtns(uint8_t *opbtn)
 {
     uint8_t shared = 0;
     uint8_t keyboard = 0;
+    waccon_refresh_input();
     waccon_state_get_buttons(&waccon, &shared, NULL);
     waccon_io4_poll(&io4_config, &keyboard, NULL);
     if (opbtn != NULL) *opbtn = shared | keyboard;
@@ -256,6 +262,7 @@ void mercury_io_get_gamebtns(uint8_t *gamebtn)
 {
     uint8_t shared = 0;
     uint8_t keyboard = 0;
+    waccon_refresh_input();
     waccon_state_get_buttons(&waccon, NULL, &shared);
     waccon_io4_poll(&io4_config, NULL, &keyboard);
     if (gamebtn != NULL) *gamebtn = shared | keyboard;
