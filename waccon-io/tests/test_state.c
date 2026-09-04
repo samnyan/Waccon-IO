@@ -2,6 +2,8 @@
 #include <stdint.h>
 
 #include "waccon/shared_memory.h"
+#include "waccon/mercuryio.h"
+#include "waccon_io4.h"
 #include "waccon_state.h"
 
 int main(void)
@@ -32,6 +34,14 @@ int main(void)
     waccon_state_get_buttons(&state, &opbtn, &gamebtn);
     assert(opbtn == 0);
     assert(gamebtn == 0);
+
+    waccon_io4_map_buttons(true, false, true, false, true, &opbtn, &gamebtn);
+    assert(opbtn == (MERCURY_IO_OPBTN_TEST | MERCURY_IO_OPBTN_COIN));
+    assert(gamebtn == MERCURY_IO_GAMEBTN_VOL_DOWN);
+
+    waccon_io4_map_buttons(false, true, false, true, false, &opbtn, &gamebtn);
+    assert(opbtn == MERCURY_IO_OPBTN_SERVICE);
+    assert(gamebtn == MERCURY_IO_GAMEBTN_VOL_UP);
 
     waccon_state_destroy(&state);
     return 0;

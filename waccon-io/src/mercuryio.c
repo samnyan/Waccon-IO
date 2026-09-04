@@ -5,6 +5,7 @@
 #include "waccon_state.h"
 #include "waccon_touch.h"
 #include "waccon_log.h"
+#include "waccon_io4.h"
 
 static struct waccon_state waccon;
 static struct waccon_touch_backend touch_backend;
@@ -30,6 +31,7 @@ static bool cursor_enabled = true;
 static bool wintouch_enabled = true;
 static bool mouse_enabled = true;
 
+static struct waccon_io4_config io4_config;
 static bool debug_enabled = true;
 static bool console_enabled = true;
 
@@ -44,6 +46,10 @@ static void waccon_load_config(void)
     waccon_log_open_console(console_enabled);
     waccon_log("config debug=%d console=%d cursor=%d wintouch=%d mouse=%d\n",
         debug_enabled, console_enabled, cursor_enabled, wintouch_enabled, mouse_enabled);
+    waccon_io4_config_load(&io4_config, L".\\segatools.ini");
+    waccon_log("io4 keys test=0x%02X service=0x%02X coin=0x%02X volup=0x%02X voldown=0x%02X\n",
+        io4_config.vk_test, io4_config.vk_service, io4_config.vk_coin,
+        io4_config.vk_vol_up, io4_config.vk_vol_down);
 }
 
 static HWND waccon_is_game_window(HWND hwnd)
@@ -194,8 +200,18 @@ HRESULT mercury_io_init(void)
 HRESULT mercury_io_poll(void)
 {
     static uint64_t last_log;
+    static uint8_t last_keyboard_opbtn;
+    static uint8_t last_keyboard_gamebtn;
+    uint8_t keyboard_opbtn;
+    uint8_t keyboard_gamebtn;
     uint64_t now = GetTickCount64();
     waccon_state_poll(&waccon);
+    waccon_io4_poll(&io4_config, &keyboard_opbtn, &keyboard_gamebtn);
+    if (keyboard_opbtn != last_keyboard_opbtn || keyboard_gamebtn != last_keyboard_gamebtn) {
+        waccon_log("io4 keyboard opbtn=0x%02X gamebtn=0x%02X\n", keyboard_opbtn, keyboard_gamebtn);
+        last_keyboard_opbtn = keyboard_opbtn;
+        last_keyboard_gamebtn = keyboard_gamebtn;
+    }
     waccon_state_get_touch(&waccon, touch_cells);
     waccon_ensure_touch_window();
     if (touch_backend.attached && wintouch_enabled) {
@@ -214,8 +230,23 @@ HRESULT mercury_io_poll(void)
     return S_OK;
 }
 
-void mercury_io_get_opbtns(uint8_t *opbtn) { waccon_state_get_buttons(&waccon, opbtn, NULL); }
-void mercury_io_get_gamebtns(uint8_t *gamebtn) { waccon_state_get_buttons(&waccon, NULL, gamebtn); }
+void mercury_io_get_opbtns(uint8_t *opbtn)
+{
+    uint8_t shared = 0;
+    uint8_t keyboard = 0;
+    waccon_state_get_buttons(&waccon, &shared, NULL);
+    waccon_io4_poll(&io4_config, &keyboard, NULL);
+    if (opbtn != NULL) *opbtn = shared | keyboard;
+}
+
+void mercury_io_get_gamebtns(uint8_t *gamebtn)
+{
+    uint8_t shared = 0;
+    uint8_t keyboard = 0;
+    waccon_state_get_buttons(&waccon, NULL, &shared);
+    waccon_io4_poll(&io4_config, NULL, &keyboard);
+    if (gamebtn != NULL) *gamebtn = shared | keyboard;
+}
 HRESULT mercury_io_touch_init(void)
 {
     waccon_log("mercury_io_touch_init\n");

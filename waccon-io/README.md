@@ -51,3 +51,14 @@ mouse=1     ; enable left-button mouse fallback (default 1)
 ```
 
 `cursor=1` periodically balances the game's `ShowCursor(FALSE)` calls and restores the standard arrow cursor. Set it to `0` if the game or another overlay must control cursor visibility.
+
+The standard segatools `[io4]` keyboard bindings are also supported directly by this DLL. They are sampled when the game reads the operator or game buttons, so they do not depend on `mercury_io_poll()` being called:
+
+```ini
+[io4]
+test=0x70     ; F1
+service=0x71  ; F2
+coin=0x72     ; F3
+volup=0x26    ; Up Arrow
+voldown=0x28  ; Down Arrow
+```
