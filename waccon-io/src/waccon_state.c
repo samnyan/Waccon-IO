@@ -84,6 +84,13 @@ void waccon_state_get_buttons(const struct waccon_state *state, uint8_t *opbtn, 
     LeaveCriticalSection((LPCRITICAL_SECTION) &state->input_lock);
 }
 
+void waccon_state_get_touch(const struct waccon_state *state, bool cells[WACCON_IO_TOUCH_CELLS])
+{
+    EnterCriticalSection((LPCRITICAL_SECTION) &state->input_lock);
+    memcpy(cells, state->input.touch_cells, WACCON_IO_TOUCH_CELLS);
+    LeaveCriticalSection((LPCRITICAL_SECTION) &state->input_lock);
+}
+
 void waccon_state_poll(struct waccon_state *state)
 {
     uint64_t now = waccon_now_ms();

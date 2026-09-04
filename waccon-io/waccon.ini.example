@@ -1,4 +1,8 @@
 [waccon]
+; Emit Waccon lifecycle diagnostics. Default: 1.
+debug=1
+; Attach to the launcher console, or create one if unavailable. Default: 1.
+console=1
 ; Force the game cursor visible. Default: 1.
 cursor=1
 ; Enable WM_TOUCH input on the current-process game window. Default: 1.

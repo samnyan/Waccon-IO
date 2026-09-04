@@ -1,4 +1,5 @@
 #include "waccon_touch.h"
+#include "waccon_log.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -66,6 +67,7 @@ static void waccon_touch_update(const TOUCHINPUT *input)
     point.x = input->x / 100;
     point.y = input->y / 100;
     ScreenToClient(active_backend->hwnd, &point);
+    waccon_log("WM_TOUCH id=%lu flags=0x%lx client=(%ld,%ld)\n", input->dwID, input->dwFlags, point.x, point.y);
     EnterCriticalSection(&active_backend->lock);
     for (i = 0; i < active_backend->contact_count; i++) {
         if (active_backend->contacts[i].id == input->dwID) {
@@ -121,7 +123,11 @@ HRESULT waccon_touch_attach(struct waccon_touch_backend *backend, HWND hwnd, con
     InitializeCriticalSection(&backend->lock);
     backend->hwnd = hwnd;
     active_mapping = *mapping;
-    if (!RegisterTouchWindow(hwnd, 0)) return HRESULT_FROM_WIN32(GetLastError());
+    waccon_log("WinTouch registering hwnd=%p\n", hwnd);
+    if (!RegisterTouchWindow(hwnd, 0)) {
+        waccon_log("RegisterTouchWindow failed error=%lu\n", GetLastError());
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
     backend->original_wndproc = (WNDPROC)GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
     if (backend->original_wndproc == NULL) return HRESULT_FROM_WIN32(GetLastError());
     SetLastError(ERROR_SUCCESS);
@@ -149,7 +155,6 @@ void waccon_mouse_poll(HWND hwnd, bool cells[240])
 {
     POINT point;
     RECT rect;
-    memset(cells, 0, sizeof(bool) * 240);
     if (hwnd == NULL || GetForegroundWindow() != hwnd) return;
     if (!GetCursorPos(&point) || !ScreenToClient(hwnd, &point)) return;
     if (!GetClientRect(hwnd, &rect)) return;
