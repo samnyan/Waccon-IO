@@ -12,17 +12,30 @@ import {
 const canvas = document.getElementById('canvas');
 const context = canvas.getContext('2d');
 const statusOutput = document.getElementById('status');
+const ioButtons = document.getElementById('io-buttons');
+const showIoButtons = document.getElementById('show-io-buttons');
+const ioButtonElements = [...ioButtons.querySelectorAll('button[data-io-button]')];
 const settingsButton = document.getElementById('settings-button');
 const settingsDialog = document.getElementById('settings-dialog');
 const settingsSave = document.getElementById('settings-save');
 const ledBrightnessAmplifier = document.getElementById('led-brightness-amplifier');
-
+const IoButtonBits = Object.freeze({
+    test: { opbtn: 0x01, gamebtn: 0 },
+    service: { opbtn: 0x02, gamebtn: 0 },
+    coin: { opbtn: 0x04, gamebtn: 0 },
+    volumeUp: { opbtn: 0, gamebtn: 0x01 },
+    volumeDown: { opbtn: 0, gamebtn: 0x02 },
+});
+const ioButtonsState = new Map();
+let ioOpButtons = 0;
+let ioGameButtons = 0;
 const SettingsStorageKey = 'waccon.controller.settings';
 // Lower gamma produces a stronger lift for dark LED colors. Adjust this one
 // value when tuning the preview brightness: 0.4 is moderate, 0.25 is strong.
 const LedPreviewGamma = 0.25;
 const settings = {
     ledBrightnessAmplifier: false,
+    showIoButtons: true,
 };
 const ledPreviewCurve = new LedPreviewCurve(LedPreviewGamma);
 
@@ -76,12 +89,33 @@ function sendFrame(kind, payload = new Uint8Array()) {
 
 function sendSnapshot() {
     if (!connected) return;
-    // Unlike toucca's legacy 30-byte bitset, WCON carries 240 one-byte cells
-    // at payload offsets 2..241, matching struct waccon_shm_input exactly.
-    sendFrame(Wcon.inputSnapshot, encodeInputSnapshot(activeCells, sourceId, BigInt(Date.now()) * 1000n));
+    const payload = encodeInputSnapshot(activeCells, sourceId, BigInt(Date.now()) * 1000n);
+    payload[0] = ioOpButtons;
+    payload[1] = ioGameButtons;
+    sendFrame(Wcon.inputSnapshot, payload);
+}
+
+function setIoButton(name, pressed) {
+    if (!IoButtonBits[name] || ioButtonsState.get(name) === pressed) return;
+    ioButtonsState.set(name, pressed);
+    const button = ioButtonElements.find(element => element.dataset.ioButton === name);
+    button?.classList.toggle('pressed', pressed);
+    ioOpButtons = 0;
+    ioGameButtons = 0;
+    for (const [buttonName, isPressed] of ioButtonsState) {
+        if (!isPressed) continue;
+        ioOpButtons |= IoButtonBits[buttonName].opbtn;
+        ioGameButtons |= IoButtonBits[buttonName].gamebtn;
+    }
+    sendSnapshot();
+}
+
+function releaseAllIoButtons() {
+    for (const name of ioButtonsState.keys()) setIoButton(name, false);
 }
 
 function clearInput() {
+    releaseAllIoButtons();
     activePointers.clear();
     activeCells.fill(0);
     draw();
@@ -163,10 +197,14 @@ function loadSettings() {
     try {
         const saved = JSON.parse(localStorage.getItem(SettingsStorageKey) || '{}');
         settings.ledBrightnessAmplifier = saved.ledBrightnessAmplifier === true;
+        settings.showIoButtons = saved.showIoButtons !== false;
     } catch {
         settings.ledBrightnessAmplifier = false;
+        settings.showIoButtons = true;
     }
     ledBrightnessAmplifier.checked = settings.ledBrightnessAmplifier;
+    showIoButtons.checked = settings.showIoButtons;
+    ioButtons.hidden = !settings.showIoButtons;
 }
 
 function setSettingsOpen(open) {
@@ -176,7 +214,9 @@ function setSettingsOpen(open) {
 
 function saveSettings() {
     settings.ledBrightnessAmplifier = ledBrightnessAmplifier.checked;
+    settings.showIoButtons = showIoButtons.checked;
     localStorage.setItem(SettingsStorageKey, JSON.stringify(settings));
+    ioButtons.hidden = !settings.showIoButtons;
     setSettingsOpen(false);
     draw();
 }
@@ -258,6 +298,21 @@ window.setInterval(() => {
     if (connected && activeCellList(activeCells).length > 0) sendSnapshot();
 }, 100);
 window.setInterval(refreshBridgeStatus, 1000);
+
+for (const button of ioButtonElements) {
+    const name = button.dataset.ioButton;
+    button.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        button.setPointerCapture(event.pointerId);
+        setIoButton(name, true);
+    });
+    for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+        button.addEventListener(eventName, event => {
+            event.preventDefault();
+            setIoButton(name, false);
+        });
+    }
+}
 
 settingsButton.addEventListener('click', () => {
     setSettingsOpen(settingsDialog.getAttribute('aria-hidden') === 'true');

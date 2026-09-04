@@ -3,12 +3,12 @@ name: waccon-io
 on:
   push:
     paths:
-      - 'Waccon/waccon-io/**'
-      - 'Waccon/.github/workflows/waccon-io.yml'
+      - 'waccon-io/**'
+      - '.github/workflows/waccon-io.yml'
   pull_request:
     paths:
-      - 'Waccon/waccon-io/**'
-      - 'Waccon/.github/workflows/waccon-io.yml'
+      - 'waccon-io/**'
+      - '.github/workflows/waccon-io.yml'
 
 jobs:
   build:

@@ -1,7 +1,8 @@
 [waccon]
-; Emit Waccon lifecycle diagnostics. Default: 1.
-debug=1
-; Attach to the launcher console, or create one if unavailable. Default: 1.
+; Enable diagnostic logging, including touch coordinates and cell mapping. Default: 0.
+debug=0
+; Send enabled diagnostics to a console. If 0, use the debugger output instead.
+; This setting has no effect while debug=0. Default: 1.
 console=1
 ; Force the game cursor visible. Default: 1.
 cursor=1

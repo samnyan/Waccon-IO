@@ -8,6 +8,17 @@
 </head>
 <body>
     <canvas id="canvas">Upgrade your browser!</canvas>
+    <div id="io-buttons" aria-label="IO buttons" hidden>
+        <div class="io-button-group">
+            <button type="button" data-io-button="volumeUp">VOL+</button>
+            <button type="button" data-io-button="volumeDown">VOL-</button>
+        </div>
+        <div class="io-button-group">
+            <button type="button" data-io-button="test">TEST</button>
+            <button type="button" data-io-button="service">SERVICE</button>
+            <button type="button" data-io-button="coin">COIN</button>
+        </div>
+    </div>
     <div id="status-panel">
         <output id="status" aria-live="polite">Connecting…</output>
         <button id="settings-button" type="button" aria-haspopup="dialog" aria-expanded="false">Settings</button>
@@ -17,6 +28,10 @@
         <label>
             <input id="led-brightness-amplifier" type="checkbox">
             LED brightness amplifier
+        </label>
+        <label>
+            <input id="show-io-buttons" type="checkbox">
+            Show IO Buttons
         </label>
         <div class="settings-actions">
             <button id="settings-save" type="button">Save</button>

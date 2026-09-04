@@ -41,10 +41,10 @@ static void waccon_load_config(void)
     cursor_enabled = GetPrivateProfileIntW(L"waccon", L"cursor", 1, L".\\segatools.ini") != 0;
     wintouch_enabled = GetPrivateProfileIntW(L"waccon", L"wintouch", 1, L".\\segatools.ini") != 0;
     mouse_enabled = GetPrivateProfileIntW(L"waccon", L"mouse", 1, L".\\segatools.ini") != 0;
-    debug_enabled = GetPrivateProfileIntW(L"waccon", L"debug", 1, L".\\segatools.ini") != 0;
+    debug_enabled = GetPrivateProfileIntW(L"waccon", L"debug", 0, L".\\segatools.ini") != 0;
     console_enabled = GetPrivateProfileIntW(L"waccon", L"console", 1, L".\\segatools.ini") != 0;
     waccon_log_set_enabled(debug_enabled);
-    waccon_log_open_console(console_enabled);
+    waccon_log_open_console(debug_enabled && console_enabled);
     waccon_log("config debug=%d console=%d cursor=%d wintouch=%d mouse=%d\n",
         debug_enabled, console_enabled, cursor_enabled, wintouch_enabled, mouse_enabled);
     waccon_touch_mapping_config_load(&touch_mapping, L".\\segatools.ini");
@@ -186,7 +186,6 @@ static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
 }
 
 uint16_t mercury_io_get_api_version(void) {
-    waccon_log_open_console(true);
     waccon_log("mercury_io_get_api_version -> 0x0100 pid=%lu\n", GetCurrentProcessId());
     return WACCON_IO_API_VERSION;
 }

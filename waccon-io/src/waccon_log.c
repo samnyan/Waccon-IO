@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <windows.h>
 
-static bool log_enabled = true;
+static bool log_enabled;
 static bool console_ready;
 static CRITICAL_SECTION log_lock;
 static LONG log_lock_state;

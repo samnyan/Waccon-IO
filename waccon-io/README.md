@@ -59,10 +59,14 @@ Copy `waccon.ini.example` settings into the `[waccon]` section of `segatools.ini
 
 ```ini
 [waccon]
-cursor=1    ; force the game cursor visible (default 1)
-wintouch=1  ; enable WM_TOUCH provider (default 1)
-mouse=1     ; enable left-button mouse fallback (default 1)
+debug=0    ; diagnostic logging, including touch coordinates (default 0)
+console=1  ; send enabled diagnostics to a console; 0 uses debugger output (default 1)
+cursor=1   ; force the game cursor visible (default 1)
+wintouch=1 ; enable WM_TOUCH provider (default 1)
+mouse=1    ; enable left-button mouse fallback (default 1)
 ```
+
+`debug` is the master switch for Waccon diagnostic logs. When it is `0`, Waccon does not print touch coordinates, normalized coordinates, mapped cells, window events, polling messages, or other diagnostic messages. When it is `1`, `console=1` attaches to the parent console (or creates one) and writes diagnostics there; `console=0` leaves the console alone and sends enabled diagnostics to the debugger via `OutputDebugString`. Therefore `console` is an output destination, not a separate basic-log or touch-log switch.
 
 `cursor=1` periodically balances the game's `ShowCursor(FALSE)` calls and restores the standard arrow cursor. Set it to `0` if the game or another overlay must control cursor visibility.
 

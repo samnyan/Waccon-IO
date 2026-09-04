@@ -13,6 +13,46 @@ html, body {
     user-select: none;
 }
 
+#io-buttons {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: min(440px, calc(100vw - 32px));
+    font: 12px system-ui, sans-serif;
+}
+
+.io-button-group {
+    display: flex;
+    gap: 6px;
+}
+
+#io-buttons[hidden] {
+    display: none;
+}
+
+#io-buttons button {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 5px;
+    padding: 7px 9px;
+    color: rgba(255, 255, 255, 0.88);
+    background: rgba(18, 18, 18, 0.88);
+    font: inherit;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+
+#io-buttons button:active,
+#io-buttons button.pressed {
+    color: #fff;
+    border-color: #6fb4ff;
+    background: rgba(50, 110, 255, 0.72);
+}
+
 #status-panel {
     position: fixed;
     right: 16px;
@@ -71,6 +111,10 @@ html, body {
     gap: 7px;
     line-height: 1.35;
     cursor: pointer;
+}
+
+#settings-dialog label + label {
+    margin-top: 8px;
 }
 
 .settings-actions {
