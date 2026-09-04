@@ -6,7 +6,7 @@ namespace Waccon.Server;
 public sealed record ServerOptions
 {
     /// <summary>TCP bind address.</summary>
-    public string ListenAddress { get; init; } = "127.0.0.1";
+    public string ListenAddress { get; init; } = "0.0.0.0";
     /// <summary>TCP listening port.</summary>
     public int TcpPort { get; init; } = 52468;
     /// <summary>HTTP and WebSocket listening port.</summary>

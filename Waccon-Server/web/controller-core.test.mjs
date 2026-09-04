@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cellForPoint, createLayout, decodeLedSnapshot, encodeInputSnapshot, ledColorForCell, ledUnitForCell, TouchLayout } from './controller-core.js';
+import { cellForPoint, createLayout, decodeLedSnapshot, encodeInputSnapshot, ledColorForCell, ledUnitForCell, LedPreviewCurve, TouchLayout } from './controller-core.js';
 
 const layout = createLayout(1000, 1000);
 const point = (angle, radius) => ({
@@ -44,3 +44,11 @@ assert.equal(led.unitCount, 480);
 assert.deepEqual(Array.from(led.colors.slice(0, 4)), [40, 20, 30, 255]);
 led.colors[3] = 0;
 assert.equal(ledColorForCell(led.colors, 0), 'rgba(40, 20, 30, 0.35)');
+
+const previewCurve = new LedPreviewCurve(0.4);
+assert.equal(previewCurve.convert(0), 0);
+assert.equal(previewCurve.convert(255), 255);
+assert.deepEqual(previewCurve.convertRgb(8, 2, 0), [64, 37, 0]);
+assert.throws(() => previewCurve.setGamma(0), RangeError);
+const strongCurve = new LedPreviewCurve(0.25);
+assert.ok(strongCurve.convert(8) > previewCurve.convert(8));

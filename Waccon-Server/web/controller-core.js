@@ -106,6 +106,29 @@ export function decodeLedSnapshot(payload) {
     return { unitCount, colors };
 }
 
+export class LedPreviewCurve {
+    constructor(gamma = 0.4) {
+        this.lut = new Uint8Array(256);
+        this.setGamma(gamma);
+    }
+
+    setGamma(gamma) {
+        if (!Number.isFinite(gamma) || gamma <= 0) throw new RangeError('Gamma must be greater than zero.');
+        for (let value = 0; value < 256; value++) {
+            this.lut[value] = Math.round(Math.pow(value / 255, gamma) * 255);
+        }
+    }
+
+    convert(value) {
+        return this.lut[value];
+    }
+
+    convertRgb(r, g, b) {
+        const lut = this.lut;
+        return [lut[r], lut[g], lut[b]];
+    }
+}
+
 export function ledColorForCell(colors, cell) {
     if (!(colors instanceof Uint8ClampedArray) || colors.length !== TouchLayout.cellCount * 4) {
         throw new RangeError('Expected 240 RGBA cell colors.');

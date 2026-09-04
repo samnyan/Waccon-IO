@@ -4,9 +4,9 @@ import {
     createLayout,
     encodeInputSnapshot,
     decodeLedSnapshot,
-    ledColorForCell,
     sameCells,
     TouchLayout,
+    LedPreviewCurve,
 } from './controller-core.js';
 
 const canvas = document.getElementById('canvas');
@@ -18,9 +18,13 @@ const settingsSave = document.getElementById('settings-save');
 const ledBrightnessAmplifier = document.getElementById('led-brightness-amplifier');
 
 const SettingsStorageKey = 'waccon.controller.settings';
+// Lower gamma produces a stronger lift for dark LED colors. Adjust this one
+// value when tuning the preview brightness: 0.4 is moderate, 0.25 is strong.
+const LedPreviewGamma = 0.25;
 const settings = {
     ledBrightnessAmplifier: false,
 };
+const ledPreviewCurve = new LedPreviewCurve(LedPreviewGamma);
 
 const Wcon = Object.freeze({
     version: 0x0100,
@@ -136,9 +140,7 @@ function draw() {
                 context.closePath();
                 const cell = side * TouchLayout.sideCellCount + ring * TouchLayout.sectorCount + sector;
                 if (activeCells[cell]) {
-                    const offset = cell * 4;
-                    const alpha = Math.max(0.35, ledColors[offset + 3] / 255);
-                    context.fillStyle = `rgba(${ledColors[offset]}, ${ledColors[offset + 1]}, ${ledColors[offset + 2]}, ${alpha})`;
+                    context.fillStyle = amplifiedLedColor(cell);
                     context.fill();
                 } else {
                     const offset = cell * 4;
@@ -180,8 +182,12 @@ function saveSettings() {
 }
 
 function amplifiedLedColor(cell) {
-    // TODO: apply the user-provided amplifier curve here.
-    return ledColorForCell(ledColors, cell);
+    const offset = cell * 4;
+    const [r, g, b] = settings.ledBrightnessAmplifier
+        ? ledPreviewCurve.convertRgb(ledColors[offset], ledColors[offset + 1], ledColors[offset + 2])
+        : [ledColors[offset], ledColors[offset + 1], ledColors[offset + 2]];
+    const alpha = Math.max(0.35, ledColors[offset + 3] / 255);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 async function refreshBridgeStatus() {
