@@ -8,7 +8,20 @@
 </head>
 <body>
     <canvas id="canvas">Upgrade your browser!</canvas>
-    <output id="status" aria-live="polite">Connecting…</output>
+    <div id="status-panel">
+        <output id="status" aria-live="polite">Connecting…</output>
+        <button id="settings-button" type="button" aria-haspopup="dialog" aria-expanded="false">Settings</button>
+    </div>
+    <section id="settings-dialog" role="dialog" aria-labelledby="settings-title" aria-hidden="true">
+        <h2 id="settings-title">Settings</h2>
+        <label>
+            <input id="led-brightness-amplifier" type="checkbox">
+            LED brightness amplifier
+        </label>
+        <div class="settings-actions">
+            <button id="settings-save" type="button">Save</button>
+        </div>
+    </section>
     <script type="module" src="./controller.js"></script>
 </body>
 </html>

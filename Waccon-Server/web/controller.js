@@ -12,6 +12,15 @@ import {
 const canvas = document.getElementById('canvas');
 const context = canvas.getContext('2d');
 const statusOutput = document.getElementById('status');
+const settingsButton = document.getElementById('settings-button');
+const settingsDialog = document.getElementById('settings-dialog');
+const settingsSave = document.getElementById('settings-save');
+const ledBrightnessAmplifier = document.getElementById('led-brightness-amplifier');
+
+const SettingsStorageKey = 'waccon.controller.settings';
+const settings = {
+    ledBrightnessAmplifier: false,
+};
 
 const Wcon = Object.freeze({
     version: 0x0100,
@@ -134,7 +143,7 @@ function draw() {
                 } else {
                     const offset = cell * 4;
                     if (ledColors[offset] || ledColors[offset + 1] || ledColors[offset + 2]) {
-                        context.fillStyle = ledColorForCell(ledColors, cell);
+                        context.fillStyle = amplifiedLedColor(cell);
                         context.fill();
                     }
                     context.stroke();
@@ -146,6 +155,33 @@ function draw() {
 
 function setStatus(value) {
     statusOutput.textContent = value;
+}
+
+function loadSettings() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(SettingsStorageKey) || '{}');
+        settings.ledBrightnessAmplifier = saved.ledBrightnessAmplifier === true;
+    } catch {
+        settings.ledBrightnessAmplifier = false;
+    }
+    ledBrightnessAmplifier.checked = settings.ledBrightnessAmplifier;
+}
+
+function setSettingsOpen(open) {
+    settingsDialog.setAttribute('aria-hidden', String(!open));
+    settingsButton.setAttribute('aria-expanded', String(open));
+}
+
+function saveSettings() {
+    settings.ledBrightnessAmplifier = ledBrightnessAmplifier.checked;
+    localStorage.setItem(SettingsStorageKey, JSON.stringify(settings));
+    setSettingsOpen(false);
+    draw();
+}
+
+function amplifiedLedColor(cell) {
+    // TODO: apply the user-provided amplifier curve here.
+    return ledColorForCell(ledColors, cell);
 }
 
 async function refreshBridgeStatus() {
@@ -216,6 +252,12 @@ window.setInterval(() => {
     if (connected && activeCellList(activeCells).length > 0) sendSnapshot();
 }, 100);
 window.setInterval(refreshBridgeStatus, 1000);
+
+settingsButton.addEventListener('click', () => {
+    setSettingsOpen(settingsDialog.getAttribute('aria-hidden') === 'true');
+});
+settingsSave.addEventListener('click', saveSettings);
+loadSettings();
 
 resize();
 connect();

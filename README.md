@@ -1,4 +1,4 @@
-# Waccon
+# Waccon IO
 
 Waccon is a modular virtual controller and IO bridge for WACCA (`mercury`) using segatools' custom `mercuryio` interface. It is intended to replace serial loopback-based controller stacks with native hook-based input and LED output.
 

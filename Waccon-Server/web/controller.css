@@ -13,11 +13,68 @@ html, body {
     user-select: none;
 }
 
-#status {
+#status-panel {
     position: fixed;
     right: 16px;
     bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     color: rgba(255, 255, 255, 0.75);
     font: 13px system-ui, sans-serif;
-    pointer-events: none;
+}
+
+#settings-button,
+#settings-save {
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 5px;
+    padding: 5px 9px;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(20, 20, 20, 0.85);
+    font: inherit;
+    cursor: pointer;
+}
+
+#settings-button:hover,
+#settings-save:hover {
+    background: rgba(55, 55, 55, 0.9);
+}
+
+#settings-dialog {
+    position: fixed;
+    right: 16px;
+    bottom: 52px;
+    width: 220px;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 7px;
+    color: rgba(255, 255, 255, 0.86);
+    background: rgba(18, 18, 18, 0.96);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.45);
+    font: 13px system-ui, sans-serif;
+}
+
+#settings-dialog[aria-hidden="true"] {
+    display: none;
+}
+
+#settings-title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#settings-dialog label {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
 }
