@@ -121,6 +121,20 @@ int waccon_touch_mapping_cell(const struct waccon_touch_mapping *mapping, float 
     return side * 120 + ring * 30 + sector;
 }
 
+static int waccon_touch_mapping_client_cell(
+    const struct waccon_touch_mapping *mapping,
+    int32_t client_x,
+    int32_t client_y)
+{
+    float normalized_x;
+    float normalized_y;
+
+    if (mapping == NULL || mapping->width <= 0 || mapping->height <= 0) return -1;
+    normalized_x = (float)client_x / (float)mapping->width;
+    normalized_y = (float)client_y / (float)mapping->height;
+    return waccon_touch_mapping_cell(mapping, normalized_x, normalized_y);
+}
+
 void waccon_touch_clear(struct waccon_touch_backend *backend)
 {
     EnterCriticalSection(&backend->lock);
@@ -160,11 +174,14 @@ static void waccon_touch_update(const TOUCHINPUT *input)
         if (contact != NULL) {
             int cell;
             contact->phase = (input->dwFlags & TOUCHEVENTF_DOWN) ? WACCON_TOUCH_DOWN : WACCON_TOUCH_MOVE;
-            contact->x = (float)point.x / (float)active_mapping.width;
-            contact->y = (float)point.y / (float)active_mapping.height;
+            contact->x = point.x;
+            contact->y = point.y;
             contact->pressure = 1.0f;
-            cell = waccon_touch_mapping_cell(&active_mapping, contact->x, contact->y);
-            waccon_log("WM_TOUCH normalized=(%.3f,%.3f) cell=%d\n", contact->x, contact->y, cell);
+            cell = waccon_touch_mapping_client_cell(&active_mapping, contact->x, contact->y);
+            waccon_log("WM_TOUCH normalized=(%.3f,%.3f) cell=%d\n",
+                (float)contact->x / active_mapping.width,
+                (float)contact->y / active_mapping.height,
+                cell);
         }
     }
     LeaveCriticalSection(&active_backend->lock);
@@ -236,23 +253,16 @@ void waccon_touch_detach(struct waccon_touch_backend *backend)
     DeleteCriticalSection(&backend->lock);
 }
 
-void waccon_mouse_poll(HWND hwnd, bool cells[240])
+static void waccon_touch_collect_mouse(HWND hwnd, bool cells[240])
 {
     POINT point;
-    RECT rect;
-    memset(cells, 0, sizeof(bool) * 240);
     if (hwnd == NULL || GetForegroundWindow() != hwnd) return;
     if (!GetCursorPos(&point) || !ScreenToClient(hwnd, &point)) return;
-    if (!GetClientRect(hwnd, &rect)) return;
     if (!(GetAsyncKeyState(VK_LBUTTON) & 0x8000)) return;
-    active_mapping.width = rect.right - rect.left;
-    active_mapping.height = rect.bottom - rect.top;
-    if (active_mapping.width <= 0 || active_mapping.height <= 0) return;
     {
-        int cell;
+        int cell = waccon_touch_mapping_client_cell(&active_mapping, point.x, point.y);
         float normalized_x = (float)point.x / active_mapping.width;
         float normalized_y = (float)point.y / active_mapping.height;
-        cell = waccon_touch_mapping_cell(&active_mapping, normalized_x, normalized_y);
         waccon_log_window_event("mouse-left", hwnd, WM_LBUTTONDOWN, point.x, point.y);
         waccon_log("mouse normalized=(%.3f,%.3f) cell=%d client=%ldx%ld\n",
             normalized_x, normalized_y, cell, active_mapping.width, active_mapping.height);
@@ -260,15 +270,18 @@ void waccon_mouse_poll(HWND hwnd, bool cells[240])
     }
 }
 
-void waccon_touch_poll(struct waccon_touch_backend *backend, bool cells[240])
+void waccon_touch_collect(struct waccon_touch_backend *backend, HWND hwnd, bool mouse_enabled, bool cells[240])
 {
     uint32_t i;
+
     memset(cells, 0, sizeof(bool) * 240);
-    if (backend == NULL || !backend->attached) return;
-    EnterCriticalSection(&backend->lock);
-    for (i = 0; i < backend->contact_count; i++) {
-        int cell = waccon_touch_mapping_cell(&active_mapping, backend->contacts[i].x, backend->contacts[i].y);
-        if (cell >= 0) cells[cell] = true;
+    if (backend != NULL && backend->attached) {
+        EnterCriticalSection(&backend->lock);
+        for (i = 0; i < backend->contact_count; i++) {
+            int cell = waccon_touch_mapping_client_cell(&active_mapping, backend->contacts[i].x, backend->contacts[i].y);
+            if (cell >= 0) cells[cell] = true;
+        }
+        LeaveCriticalSection(&backend->lock);
     }
-    LeaveCriticalSection(&backend->lock);
+    if (mouse_enabled) waccon_touch_collect_mouse(hwnd, cells);
 }

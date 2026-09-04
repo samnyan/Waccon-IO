@@ -145,12 +145,8 @@ static void waccon_collect_touch_cells(bool cells[WACCON_IO_TOUCH_CELLS])
 
     waccon_refresh_input();
     waccon_state_get_touch(&waccon, cells);
-    if (touch_backend.attached && wintouch_enabled) {
-        waccon_touch_poll(&touch_backend, local_cells);
-        for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) cells[i] = cells[i] || local_cells[i];
-    }
-    if (mouse_enabled && game_window != NULL) {
-        waccon_mouse_poll(game_window, local_cells);
+    if (game_window != NULL) {
+        waccon_touch_collect(&touch_backend, game_window, mouse_enabled, local_cells);
         for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) cells[i] = cells[i] || local_cells[i];
     }
 }
@@ -189,7 +185,7 @@ static void waccon_ensure_game_window(void)
         game_window, touch_mapping.width, touch_mapping.height, window_scan_attempts);
     if (SUCCEEDED(waccon_touch_attach(&touch_backend, game_window, &touch_mapping))) {
         waccon_log("WinTouch attached\n");
-        waccon_touch_poll(&touch_backend, touch_cells);
+        waccon_touch_collect(&touch_backend, game_window, mouse_enabled, touch_cells);
     } else {
         waccon_log("WinTouch attach failed error=%lu\n", GetLastError());
         game_window = NULL;

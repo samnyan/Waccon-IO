@@ -16,8 +16,8 @@ enum waccon_touch_phase {
 struct waccon_touch_contact {
     uint32_t id;
     enum waccon_touch_phase phase;
-    float x;
-    float y;
+    int32_t x;
+    int32_t y;
     float pressure;
 };
 
@@ -52,6 +52,5 @@ void waccon_touch_set_mapping(const struct waccon_touch_mapping *mapping);
 void waccon_touch_clear(struct waccon_touch_backend *backend);
 HRESULT waccon_touch_attach(struct waccon_touch_backend *backend, HWND hwnd, const struct waccon_touch_mapping *mapping);
 void waccon_touch_detach(struct waccon_touch_backend *backend);
-void waccon_touch_poll(struct waccon_touch_backend *backend, bool cells[240]);
-void waccon_mouse_poll(HWND hwnd, bool cells[240]);
+void waccon_touch_collect(struct waccon_touch_backend *backend, HWND hwnd, bool mouse_enabled, bool cells[240]);
 LRESULT CALLBACK waccon_touch_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
