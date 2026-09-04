@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="OverlayWebview/OverlayWebview.csproj" />
+  <Project Path="Waccon-Server/Waccon.Server.csproj" />
+</Solution>

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <PublishAot Condition="'$(PublishAot)' == ''">false</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <IsAotCompatible>true</IsAotCompatible>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
+    <RunStartupSmokeTest Condition="'$(RunStartupSmokeTest)' == ''">false</RunStartupSmokeTest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WebView2Aot" Version="1.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="overlay_config.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Web\settings.html" />
+    <EmbeddedResource Include="..\..\WebView2Aot\HelloCompositionWebView2\runtimes\win-arm64\native\WebView2Loader.dll" Link="runtimes\win-arm64\native\WebView2Loader.dll" />
+    <EmbeddedResource Include="..\..\WebView2Aot\HelloCompositionWebView2\runtimes\win-x64\native\WebView2Loader.dll" Link="runtimes\win-x64\native\WebView2Loader.dll" />
+    <EmbeddedResource Include="..\..\WebView2Aot\HelloCompositionWebView2\runtimes\win-x86\native\WebView2Loader.dll" Link="runtimes\win-x86\native\WebView2Loader.dll" />
+  </ItemGroup>
+
+  <Target Name="RunStartupSmokeTest" AfterTargets="Publish" Condition="'$(RunStartupSmokeTest)' == 'true' And '$(RuntimeIdentifier)' == 'win-x64'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\test-startup.ps1&quot; -Executable &quot;$(PublishDir)OverlayWebview.exe&quot;" />
+  </Target>
+</Project>

@@ -1,0 +1,22 @@
+{
+  "target": {
+    "processName": "Mercury-Win64-Shipping",
+    "titlePattern": "Mercury",
+    "matchMode": "contains"
+  },
+  "web": {
+    "url": "http://127.0.0.1:52469/web/"
+  },
+  "overlay": {
+    "left": 320,
+    "top": 180,
+    "right": 320,
+    "bottom": 180,
+    "offsetX": 0,
+    "offsetY": -42,
+    "topmost": true
+  },
+  "logging": {
+    "enabled": false
+  }
+}

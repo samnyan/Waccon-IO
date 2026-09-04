@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OverlayWebview Settings</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+      background: #15171b;
+      color: #f3f4f6;
+    }
+
+    body { margin: 0; }
+    form { padding: 24px 24px 126px; }
+    h1 { font-size: 20px; margin: 0 0 22px; }
+    h2 { font-size: 14px; margin: 24px 0 10px; color: #b8c2d1; }
+    label { display: block; font-size: 12px; color: #b8c2d1; margin: 0 0 6px; }
+    input, select, button { box-sizing: border-box; font: inherit; }
+    input, select {
+      width: 100%;
+      border: 1px solid #3d4654;
+      border-radius: 6px;
+      background: #20242c;
+      color: inherit;
+      padding: 9px;
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .row { display: flex; gap: 10px; align-items: end; }
+    .row > * { flex: 1; }
+    .hint { margin: -2px 0 12px; font-size: 12px; color: #8792a5; line-height: 1.4; }
+    .checkboxes { display: flex; flex-wrap: wrap; gap: 14px; }
+    .checkboxes label { margin: 0; }
+    .checkboxes input { width: auto; margin-right: 6px; }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 13px;
+      background: #2f80ed;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.secondary { background: #303845; }
+    button.danger { background: #a34444; }
+    .actions {
+      position: fixed;
+      z-index: 1;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      padding: 12px 24px 10px;
+      border-top: 1px solid #3d4654;
+      background: #1b1f26;
+      box-shadow: 0 -8px 20px rgb(0 0 0 / 20%);
+    }
+
+    .action-buttons { display: flex; gap: 10px; }
+    #status { min-height: 19px; margin-top: 8px; font-size: 13px; color: #9ed0a6; }
+
+    @media (max-width: 500px) {
+      form { padding-right: 16px; padding-bottom: 164px; padding-left: 16px; }
+      .grid { grid-template-columns: 1fr; }
+      .actions { padding-right: 16px; padding-left: 16px; }
+      .action-buttons { display: grid; grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <form id="settings">
+    <h1>OverlayWebview</h1>
+    <h2>Target window</h2>
+    <div class="row"><div><label for="window">Detected window</label><select id="window"><option value="">Select a window</option></select></div><button class="secondary" id="refresh" type="button">Refresh</button></div>
+    <div class="grid" style="margin-top:12px"><div><label for="process">Process name</label><input id="process" placeholder="ExampleGame-Win64-Shipping"></div><div><label for="title">Title pattern</label><input id="title" placeholder="Example Game"></div></div>
+    <div style="margin-top:12px"><label for="match">Title match</label><select id="match"><option value="contains">Contains</option><option value="exact">Exact</option></select></div>
+    <h2>Web content</h2><label for="url">URL</label><input id="url" type="url" required>
+    <h2>Overlay layout</h2>
+    <p class="hint">Margins expand the overlay around the target window. Offsets move the whole overlay after that expansion.</p>
+    <div class="grid"><div><label for="left">Left margin</label><input id="left" type="number" min="0" max="10000"></div><div><label for="right">Right margin</label><input id="right" type="number" min="0" max="10000"></div><div><label for="top">Top margin</label><input id="top" type="number" min="0" max="10000"></div><div><label for="bottom">Bottom margin</label><input id="bottom" type="number" min="0" max="10000"></div><div><label for="offsetX">Offset X</label><input id="offsetX" type="number" min="-10000" max="10000"></div><div><label for="offsetY">Offset Y</label><input id="offsetY" type="number" min="-10000" max="10000"></div></div>
+    <div class="checkboxes" style="margin-top:12px"><label><input id="topmost" type="checkbox">Keep overlay on top</label><label><input id="loggingEnabled" type="checkbox">Enable diagnostic log</label></div>
+  </form>
+  <div class="actions"><div class="action-buttons"><button id="save" type="button">Save & Apply</button><button class="secondary" id="preview" type="button">Preview</button><button class="secondary" id="hide" type="button">Hide</button><button class="danger" id="exit" type="button">Exit</button></div><div id="status" role="status"></div></div>
+  <script>
+    document.getElementById('settings').addEventListener('submit', event => event.preventDefault());
+    const bridge = window.chrome?.webview;
+    const responseTimeoutMs = 3000;
+    let latestWindows = [];
+    let responseTimer;
+
+    const $ = id => document.getElementById(id);
+    const number = id => Number.parseInt($(id).value || '0', 10);
+
+    function setStatus(message, isError = false) {
+      const status = $('status');
+      status.textContent = message;
+      status.style.color = isError ? '#f59a9a' : '#9ed0a6';
+    }
+
+    function armResponseTimeout(type) {
+      window.clearTimeout(responseTimer);
+      responseTimer = window.setTimeout(() => {
+        const message = `No response received for ${type}. Enable diagnostic logging and retry.`;
+        console.error('[OverlayWebview]', message);
+        setStatus(message, true);
+      }, responseTimeoutMs);
+    }
+
+    function post(message) {
+      console.info('[OverlayWebview] Sending message:', message);
+      if (!bridge) {
+        const error = 'WebView2 message bridge is unavailable.';
+        console.error('[OverlayWebview]', error);
+        setStatus(error, true);
+        return;
+      }
+
+      try {
+        bridge.postMessage(message);
+        setStatus(`Sending ${message.type}...`);
+        armResponseTimeout(message.type);
+      } catch (error) {
+        console.error('[OverlayWebview] Failed to send message:', error);
+        setStatus(`Failed to send ${message.type}: ${error.message}`, true);
+      }
+    }
+
+    function readConfig() {
+      return {
+        target: {
+          processName: $('process').value.trim(),
+          titlePattern: $('title').value.trim(),
+          matchMode: $('match').value,
+        },
+        web: {
+          url: $('url').value.trim(),
+        },
+        overlay: {
+          left: number('left'),
+          top: number('top'),
+          right: number('right'),
+          bottom: number('bottom'),
+          offsetX: number('offsetX'),
+          offsetY: number('offsetY'),
+          topmost: $('topmost').checked,
+        },
+        logging: {
+          enabled: $('loggingEnabled').checked,
+        },
+      };
+    }
+
+    function fillConfig(config) {
+      $('process').value = config.target.processName;
+      $('title').value = config.target.titlePattern;
+      $('match').value = config.target.matchMode;
+      $('url').value = config.web.url;
+
+      for (const id of ['left', 'top', 'right', 'bottom', 'offsetX', 'offsetY']) {
+        $(id).value = config.overlay[id];
+      }
+
+      $('topmost').checked = config.overlay.topmost;
+      $('loggingEnabled').checked = config.logging?.enabled ?? false;
+    }
+
+    function fillWindows(windows) {
+      latestWindows = windows;
+      const select = $('window');
+      select.replaceChildren(new Option('Select a window', ''));
+
+      windows.forEach((item, index) => {
+        select.add(new Option(`${item.processName} — ${item.title}`, String(index)));
+      });
+    }
+
+    function bindClick(id, createMessage) {
+      $(id).addEventListener('click', () => post(createMessage()));
+    }
+
+    $('refresh').addEventListener('click', () => post({ type: 'listWindows' }));
+    $('window').addEventListener('change', event => {
+      const item = latestWindows[event.target.value];
+      if (!item) {
+        return;
+      }
+
+      $('process').value = item.processName;
+      $('title').value = item.title;
+    });
+    bindClick('save', () => ({ type: 'saveConfig', config: readConfig() }));
+    bindClick('preview', () => ({ type: 'preview' }));
+    bindClick('hide', () => ({ type: 'hideOverlay' }));
+    bindClick('exit', () => ({ type: 'exit' }));
+
+    window.addEventListener('error', event => {
+      console.error('[OverlayWebview] Unhandled page error:', event.error || event.message);
+      setStatus(`Page error: ${event.message}`, true);
+    });
+    window.addEventListener('unhandledrejection', event => {
+      console.error('[OverlayWebview] Unhandled promise rejection:', event.reason);
+      setStatus(`Page error: ${event.reason}`, true);
+    });
+
+    if (bridge) {
+      bridge.addEventListener('message', event => {
+        const data = event.data;
+        console.info('[OverlayWebview] Received message:', data);
+        window.clearTimeout(responseTimer);
+
+        if (data.type === 'config' || data.type === 'saved') {
+          fillConfig(data.config);
+        }
+        if (data.type === 'windows') {
+          fillWindows(data.windows);
+        }
+        if (data.message) {
+          setStatus(data.message, data.type === 'error');
+        }
+      });
+    } else {
+      const error = 'WebView2 message bridge is unavailable.';
+      console.error('[OverlayWebview]', error);
+      setStatus(error, true);
+    }
+
+    console.info('[OverlayWebview] Settings page initialized.');
+    post({ type: 'getConfig' });
+    post({ type: 'listWindows' });
+  </script>
+</body>
+</html>
