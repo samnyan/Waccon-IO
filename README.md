@@ -1,74 +1,92 @@
 # Waccon IO
 
-Waccon IO 是一个多功能的 WACCA 控制器。
-因为原本的类似项目基本上都是基于串口模拟，而 com0com 这种虚拟串口工具基本上在Win11已经不可用。所以基于 segatools 的 mercuryio 重新实现，不需要串口支持，并且补全LED灯效支持。
+English | [中文](README_CN.md)
 
-目前支持输入方式：
+Waccon IO is a multi-purpose controller implementation for WACCA.
 
-- wintouch触摸屏、鼠标输入
-- 网页端虚拟手台
+Most existing projects of this kind rely on serial port emulation. However, virtual serial port solutions such as com0com are no longer very practical on Windows 11.
 
-## 使用说明
+Waccon IO is instead implemented as a custom `mercuryio` module for segatools. It does not require any virtual serial ports and also includes full LED output support.
 
-### 基础准备
+Currently supported input methods:
 
-把 `waccon_io.dll` 复制到 segatools 相同目录，并编辑`segatools.ini`，在 `[mercuryio]` 项目当中填入 `path=waccon_io.dll`
+* WinTouch touchscreen and mouse input
+* Web-based virtual controller
 
-最终结果：
+## Usage
+
+### Basic Setup
+
+Copy `waccon_io.dll` into the same directory as segatools, then edit `segatools.ini` and set the `path` option under `[mercuryio]` to `waccon_io.dll`.
+
+The final configuration should look like this:
 
 ```ini
 [mercuryio]
 path=waccon_io.dll
 ```
 
-### 使用触屏、鼠标输入
+### Touchscreen and Mouse Input
 
-在 `segatools.ini` 中添加 `[waccon]` 项，并参照下方配置：
+Add a `[waccon]` section to `segatools.ini` and configure it as shown below:
 
 ```ini
 [waccon]
-; 显示鼠标光标
+; Show mouse cursor
 cursor=1
-; 开启Wintouch触摸支持
+
+; Enable WinTouch touchscreen input
 wintouch=1
-; 开启鼠标输入支持
+
+; Enable mouse input
 mouse=1
 
-; 搜索窗口标题栏名称
+; Window title used to locate the game window
 windowTitle=Mercury
 
-; 圆心坐标（屏幕比例，默认正中央偏上方一点点是合适的）
+; Center position in normalized screen coordinates
+; Slightly above the center of the screen works well by default
 centerX=0.50
 centerY=0.47
-; 外圈半径（以窗口的宽为100%，1就是全部宽度）
+
+; Outer radius
+; Relative to the window width, where 1.0 means 100% of the width
 radius=1
-; 内圈半径（输入范围是一个环，也就是60%到100%屏幕的一个环）
+
+; Inner radius
+; The input area is a ring, in this case from 60% to 100% of the configured radius
 innerRadius=0.60
+
 startAngle=-90
 reverse=0
 ```
 
-### 虚拟手台
+### Virtual Controller
 
-目前支持网页端虚拟手台。运行 `Waccon.Server.exe` ，访问屏幕上显示的地址即可进入虚拟手台。
+A web-based virtual controller is currently supported.
+
+Run `Waccon.Server.exe`, then open the address shown in the console to access the virtual controller.
+
+The listening port and other settings can be changed in `appsettings.json`.
 
 ### FAQ
 
-- Q: 启动时LED项目是Error
-  - A: 缺少ftd2xx.dll，需要放置到`WindowsNoEditor\Mercury\Binaries\Win64`目录里面
+* **Q: The LED status shows `Error` on startup.**
 
-## 项目说明
+  * **A:** `ftd2xx.dll` is missing. Place it in the `WindowsNoEditor\Mercury\Binaries\Win64` directory.
 
-- `waccon-io/` — mercuryio 模块，提供触摸输入、鼠标输入等基础功能，并通过共享内存对外开放IO。
-- `Waccon-Server/` — C#编写的虚拟手台服务端，和 waccon-io 通过共享内存通讯，转换为WebSocket、UDP等协议用于外部的虚拟手台。
+## Project Structure
 
-## 感谢清单
+* `waccon-io/` — The `mercuryio` module. Provides basic functionality such as touchscreen and mouse input, and exposes I/O data to external applications through shared memory.
+* `Waccon-Server/` — A virtual controller server written in C#. It communicates with `waccon-io` through shared memory and exposes the I/O data through protocols such as WebSocket and UDP for external virtual controllers.
 
-开发过程离不开下面这些项目的参考
+## Acknowledgements
 
-- [toucca](https://github.com/BlueGlassBlock/toucca) by BlueGlassBlock
-- Any2WACCAi by Raymonf
-- Any2WACCA_with_WACCAVCon by Mishe.W#7250
-- [Brokenithm-iOS](https://github.com/esterTion/Brokenithm-iOS) by esterTion
+This project was developed with reference to and inspiration from the following projects:
 
-**注意：这个项目使用AI进行开发。**
+* [toucca](https://github.com/BlueGlassBlock/toucca) by BlueGlassBlock
+* Any2WACCAi by Raymonf
+* Any2WACCA_with_WACCAVCon by Mishe.W#7250
+* [Brokenithm-iOS](https://github.com/esterTion/Brokenithm-iOS) by esterTion
+
+**Note: This project was developed with the assistance of AI.**
