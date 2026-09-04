@@ -61,6 +61,18 @@ void waccon_touch_mapping_config_load(struct waccon_touch_mapping *mapping, cons
     mapping->reverse = GetPrivateProfileIntW(L"waccon", L"reverse", mapping->reverse, filename) != 0;
 }
 
+void waccon_touch_set_mapping(const struct waccon_touch_mapping *mapping)
+{
+    if (mapping == NULL) return;
+    if (active_backend != NULL && active_backend->attached) {
+        EnterCriticalSection(&active_backend->lock);
+        active_mapping = *mapping;
+        LeaveCriticalSection(&active_backend->lock);
+    } else {
+        active_mapping = *mapping;
+    }
+}
+
 static float waccon_touch_mapping_distance(const struct waccon_touch_mapping *mapping, float x, float y)
 {
     float base_radius;
@@ -189,7 +201,7 @@ HRESULT waccon_touch_attach(struct waccon_touch_backend *backend, HWND hwnd, con
     memset(backend, 0, sizeof(*backend));
     InitializeCriticalSection(&backend->lock);
     backend->hwnd = hwnd;
-    active_mapping = *mapping;
+    waccon_touch_set_mapping(mapping);
     waccon_log("WinTouch registering hwnd=%p\n", hwnd);
     if (!RegisterTouchWindow(hwnd, 0)) {
         waccon_log("RegisterTouchWindow failed error=%lu\n", GetLastError());

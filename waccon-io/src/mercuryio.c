@@ -131,6 +131,7 @@ static void waccon_cursor_update(void)
 
 static uint32_t window_scan_attempts;
 static uint64_t last_window_scan_ms;
+static uint64_t last_cursor_update_ms;
 
 static void waccon_refresh_input(void)
 {
@@ -147,13 +148,14 @@ static void waccon_collect_touch_cells(bool cells[WACCON_IO_TOUCH_CELLS])
     if (touch_backend.attached && wintouch_enabled) {
         waccon_touch_poll(&touch_backend, local_cells);
         for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) cells[i] = cells[i] || local_cells[i];
-    } else if (mouse_enabled && game_window != NULL) {
+    }
+    if (mouse_enabled && game_window != NULL) {
         waccon_mouse_poll(game_window, local_cells);
         for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) cells[i] = cells[i] || local_cells[i];
     }
 }
 
-static void waccon_ensure_touch_window(void)
+static void waccon_ensure_game_window(void)
 {
     RECT rect;
     uint64_t now = GetTickCount64();
@@ -162,11 +164,12 @@ static void waccon_ensure_touch_window(void)
         waccon_touch_detach(&touch_backend);
         game_window = NULL;
     }
-    if (touch_backend.attached || !wintouch_enabled) return;
-    if (now - last_window_scan_ms < 100) return;
-    last_window_scan_ms = now;
-    window_scan_attempts++;
-    if (game_window == NULL) game_window = waccon_find_window();
+    if (game_window == NULL) {
+        if (now - last_window_scan_ms < 100) return;
+        last_window_scan_ms = now;
+        window_scan_attempts++;
+        game_window = waccon_find_window();
+    }
     if (game_window == NULL || !GetClientRect(game_window, &rect)) {
         if (window_scan_attempts == 1 || window_scan_attempts % 10 == 0) {
             waccon_log("game window not ready, scan attempt=%lu\n", window_scan_attempts);
@@ -176,6 +179,12 @@ static void waccon_ensure_touch_window(void)
     }
     touch_mapping.width = rect.right - rect.left;
     touch_mapping.height = rect.bottom - rect.top;
+    if (touch_mapping.width <= 0 || touch_mapping.height <= 0) {
+        game_window = NULL;
+        return;
+    }
+    if (!touch_backend.attached) waccon_touch_set_mapping(&touch_mapping);
+    if (touch_backend.attached || !wintouch_enabled) return;
     waccon_log("attempting WinTouch attach hwnd=%p client=%ldx%ld attempt=%lu\n",
         game_window, touch_mapping.width, touch_mapping.height, window_scan_attempts);
     if (SUCCEEDED(waccon_touch_attach(&touch_backend, game_window, &touch_mapping))) {
@@ -185,6 +194,17 @@ static void waccon_ensure_touch_window(void)
         waccon_log("WinTouch attach failed error=%lu\n", GetLastError());
         game_window = NULL;
     }
+}
+
+static void waccon_ensure_cursor(void)
+{
+    uint64_t now;
+
+    if (game_window == NULL || !cursor_enabled) return;
+    now = GetTickCount64();
+    if (now - last_cursor_update_ms < 16) return;
+    last_cursor_update_ms = now;
+    waccon_cursor_update();
 }
 
 static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
@@ -197,7 +217,8 @@ static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
         callback = state->touch_callback;
         LeaveCriticalSection(&state->touch_lock);
         if (InterlockedCompareExchange(&state->touch_stop, 0, 0) != 0) break;
-        waccon_ensure_touch_window();
+        waccon_ensure_game_window();
+        waccon_ensure_cursor();
         waccon_collect_touch_cells(callback_cells);
         if (callback != NULL) callback(callback_cells);
         Sleep(1);
@@ -238,9 +259,9 @@ HRESULT mercury_io_poll(void)
         last_keyboard_opbtn = keyboard_opbtn;
         last_keyboard_gamebtn = keyboard_gamebtn;
     }
-    waccon_ensure_touch_window();
+    waccon_ensure_game_window();
     waccon_collect_touch_cells(touch_cells);
-    if (game_window != NULL) waccon_cursor_update();
+    waccon_ensure_cursor();
     if (now - last_log >= 1000) {
         waccon_log("poll alive hwnd=%p wintouch_attached=%d cursor=%d\n", game_window, touch_backend.attached, cursor_enabled);
         last_log = now;
@@ -270,7 +291,7 @@ void mercury_io_get_gamebtns(uint8_t *gamebtn)
 HRESULT mercury_io_touch_init(void)
 {
     waccon_log("mercury_io_touch_init\n");
-    waccon_ensure_touch_window();
+    waccon_ensure_game_window();
     return S_OK;
 }
 
