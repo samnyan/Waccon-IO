@@ -119,23 +119,40 @@ static void waccon_cursor_update(void)
     if (cursor != NULL) SetCursor(cursor);
 }
 
+static uint32_t window_scan_attempts;
+static uint64_t last_window_scan_ms;
+
 static void waccon_ensure_touch_window(void)
 {
     RECT rect;
+    uint64_t now = GetTickCount64();
+    if (touch_backend.attached && (!IsWindow(touch_backend.hwnd) || !IsWindowVisible(touch_backend.hwnd))) {
+        waccon_log("attached window disappeared, resetting hwnd=%p\n", touch_backend.hwnd);
+        waccon_touch_detach(&touch_backend);
+        game_window = NULL;
+    }
     if (touch_backend.attached || !wintouch_enabled) return;
+    if (now - last_window_scan_ms < 100) return;
+    last_window_scan_ms = now;
+    window_scan_attempts++;
     if (game_window == NULL) game_window = waccon_find_window();
     if (game_window == NULL || !GetClientRect(game_window, &rect)) {
-        waccon_log("game window unavailable or GetClientRect failed, hwnd=%p error=%lu\n", game_window, GetLastError());
+        if (window_scan_attempts == 1 || window_scan_attempts % 10 == 0) {
+            waccon_log("game window not ready, scan attempt=%lu\n", window_scan_attempts);
+        }
+        game_window = NULL;
         return;
     }
     touch_mapping.width = rect.right - rect.left;
     touch_mapping.height = rect.bottom - rect.top;
-    waccon_log("attempting WinTouch attach hwnd=%p client=%ldx%ld\n", game_window, touch_mapping.width, touch_mapping.height);
+    waccon_log("attempting WinTouch attach hwnd=%p client=%ldx%ld attempt=%lu\n",
+        game_window, touch_mapping.width, touch_mapping.height, window_scan_attempts);
     if (SUCCEEDED(waccon_touch_attach(&touch_backend, game_window, &touch_mapping))) {
         waccon_log("WinTouch attached\n");
         waccon_touch_poll(&touch_backend, touch_cells);
     } else {
         waccon_log("WinTouch attach failed error=%lu\n", GetLastError());
+        game_window = NULL;
     }
 }
 
@@ -148,6 +165,7 @@ static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
         callback = state->touch_callback;
         LeaveCriticalSection(&state->touch_lock);
         if (InterlockedCompareExchange(&state->touch_stop, 0, 0) != 0) break;
+        waccon_ensure_touch_window();
         if (callback != NULL) callback(touch_cells);
         Sleep(1);
     }
@@ -201,6 +219,7 @@ void mercury_io_get_gamebtns(uint8_t *gamebtn) { waccon_state_get_buttons(&wacco
 HRESULT mercury_io_touch_init(void)
 {
     waccon_log("mercury_io_touch_init\n");
+    waccon_ensure_touch_window();
     return S_OK;
 }
 
