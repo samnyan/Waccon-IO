@@ -8,16 +8,23 @@
 static struct waccon_touch_backend *active_backend;
 static struct waccon_touch_mapping active_mapping;
 
-static int waccon_clamp_cell(int cell)
+static float waccon_touch_mapping_distance(const struct waccon_touch_mapping *mapping, float x, float y)
 {
-    return cell < 0 ? 0 : cell > 239 ? 239 : cell;
+    float base_radius;
+    float dx;
+    float dy;
+
+    if (mapping == NULL || mapping->width <= 0 || mapping->height <= 0) return -1.0f;
+    base_radius = (float)(mapping->width < mapping->height ? mapping->width : mapping->height) * 0.5f;
+    dx = (x - mapping->center_x) * (float)mapping->width;
+    dy = (y - mapping->center_y) * (float)mapping->height;
+    return sqrtf(dx * dx + dy * dy) / base_radius;
 }
 
 bool waccon_touch_mapping_contains(const struct waccon_touch_mapping *mapping, float x, float y)
 {
-    float dx = x - mapping->center_x;
-    float dy = y - mapping->center_y;
-    float distance = sqrtf(dx * dx + dy * dy);
+    if (mapping == NULL || mapping->radius <= mapping->inner_radius) return false;
+    float distance = waccon_touch_mapping_distance(mapping, x, y);
     return distance <= mapping->radius && distance >= mapping->inner_radius;
 }
 
@@ -27,27 +34,25 @@ int waccon_touch_mapping_cell(const struct waccon_touch_mapping *mapping, float 
     float dy;
     float distance;
     float angle;
-    float fraction;
     int ring;
     int sector;
     int side;
 
     if (!waccon_touch_mapping_contains(mapping, x, y)) return -1;
-    dx = x - mapping->center_x;
-    dy = y - mapping->center_y;
-    distance = sqrtf(dx * dx + dy * dy);
-    angle = atan2f(dy, dx) - mapping->start_angle;
-    while (angle < 0.0f) angle += 6.283185307f;
-    while (angle >= 6.283185307f) angle -= 6.283185307f;
-    fraction = angle / (mapping->end_angle - mapping->start_angle);
-    if (fraction < 0.0f || fraction >= 1.0f) return -1;
-    sector = (int)(fraction * 24.0f);
+    dx = (x - mapping->center_x) * (float)mapping->width;
+    dy = (y - mapping->center_y) * (float)mapping->height;
+    if (dx == 0.0f) return -1;
+    distance = waccon_touch_mapping_distance(mapping, x, y);
+    angle = atan2f(dy, fabsf(dx));
+    sector = (int)((angle + 1.570796327f) / (3.141592654f / 30.0f));
+    if (sector < 0) sector = 0;
+    if (sector > 29) sector = 29;
     ring = (int)(((distance - mapping->inner_radius) /
-        (mapping->radius - mapping->inner_radius)) * 5.0f);
-    if (ring > 4) ring = 4;
+        (mapping->radius - mapping->inner_radius)) * 4.0f + 0.00001f);
+    if (ring > 3) ring = 3;
     side = mapping->side ? 1 : (x >= mapping->center_x ? 0 : 1);
-    if (mapping->reverse) sector = 23 - sector;
-    return waccon_clamp_cell(side * 120 + ring * 24 + sector);
+    if (mapping->reverse) sector = 29 - sector;
+    return side * 120 + ring * 30 + sector;
 }
 
 void waccon_touch_clear(struct waccon_touch_backend *backend)
@@ -87,10 +92,13 @@ static void waccon_touch_update(const TOUCHINPUT *input)
             contact->id = input->dwID;
         }
         if (contact != NULL) {
+            int cell;
             contact->phase = (input->dwFlags & TOUCHEVENTF_DOWN) ? WACCON_TOUCH_DOWN : WACCON_TOUCH_MOVE;
             contact->x = (float)point.x / (float)active_mapping.width;
             contact->y = (float)point.y / (float)active_mapping.height;
             contact->pressure = 1.0f;
+            cell = waccon_touch_mapping_cell(&active_mapping, contact->x, contact->y);
+            waccon_log("WM_TOUCH normalized=(%.3f,%.3f) cell=%d\n", contact->x, contact->y, cell);
         }
     }
     LeaveCriticalSection(&active_backend->lock);

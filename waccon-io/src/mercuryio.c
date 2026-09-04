@@ -14,10 +14,10 @@ static struct waccon_touch_mapping touch_mapping = {
     .top = 0,
     .width = 1,
     .height = 1,
-    .center_x = 0.48f,
+    .center_x = 0.50f,
     .center_y = 0.50f,
-    .radius = 0.47f,
-    .inner_radius = 0.08f,
+    .radius = 1.00f,
+    .inner_radius = 0.60f,
     .start_angle = -1.5707963f,
     .end_angle = 4.7123890f,
     .side = 0,
@@ -128,6 +128,21 @@ static void waccon_cursor_update(void)
 static uint32_t window_scan_attempts;
 static uint64_t last_window_scan_ms;
 
+static void waccon_collect_touch_cells(bool cells[WACCON_IO_TOUCH_CELLS])
+{
+    bool local_cells[WACCON_IO_TOUCH_CELLS];
+    size_t i;
+
+    waccon_state_get_touch(&waccon, cells);
+    if (touch_backend.attached && wintouch_enabled) {
+        waccon_touch_poll(&touch_backend, local_cells);
+        for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) cells[i] = cells[i] || local_cells[i];
+    } else if (mouse_enabled && game_window != NULL) {
+        waccon_mouse_poll(game_window, local_cells);
+        for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) cells[i] = cells[i] || local_cells[i];
+    }
+}
+
 static void waccon_ensure_touch_window(void)
 {
     RECT rect;
@@ -166,13 +181,15 @@ static unsigned int __stdcall waccon_touch_thread_proc(void *ctx)
 {
     struct waccon_state *state = ctx;
     mercury_io_touch_callback_t callback;
+    bool callback_cells[WACCON_IO_TOUCH_CELLS];
     for (;;) {
         EnterCriticalSection(&state->touch_lock);
         callback = state->touch_callback;
         LeaveCriticalSection(&state->touch_lock);
         if (InterlockedCompareExchange(&state->touch_stop, 0, 0) != 0) break;
         waccon_ensure_touch_window();
-        if (callback != NULL) callback(touch_cells);
+        waccon_collect_touch_cells(callback_cells);
+        if (callback != NULL) callback(callback_cells);
         Sleep(1);
     }
     InterlockedExchange(&state->touch_running, 0);
@@ -212,16 +229,8 @@ HRESULT mercury_io_poll(void)
         last_keyboard_opbtn = keyboard_opbtn;
         last_keyboard_gamebtn = keyboard_gamebtn;
     }
-    waccon_state_get_touch(&waccon, touch_cells);
     waccon_ensure_touch_window();
-    if (touch_backend.attached && wintouch_enabled) {
-        bool local_cells[WACCON_IO_TOUCH_CELLS];
-        size_t i;
-        waccon_touch_poll(&touch_backend, local_cells);
-        for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) touch_cells[i] = touch_cells[i] || local_cells[i];
-    } else if (mouse_enabled && game_window != NULL) {
-        waccon_mouse_poll(game_window, touch_cells);
-    }
+    waccon_collect_touch_cells(touch_cells);
     if (game_window != NULL) waccon_cursor_update();
     if (now - last_log >= 1000) {
         waccon_log("poll alive hwnd=%p wintouch_attached=%d cursor=%d\n", game_window, touch_backend.attached, cursor_enabled);

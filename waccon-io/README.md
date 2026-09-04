@@ -52,6 +52,8 @@ mouse=1     ; enable left-button mouse fallback (default 1)
 
 `cursor=1` periodically balances the game's `ShowCursor(FALSE)` calls and restores the standard arrow cursor. Set it to `0` if the game or another overlay must control cursor visibility.
 
+Touch input uses the same in-window layout as `toucca/web`: the client area's centered circle is split into two sides, with four radial rings and 30 cells per side/ring. The usable ring spans 60% through 100% of the largest circle that fits inside the client area, so no touch cells are mapped outside the game image.
+
 The standard segatools `[io4]` keyboard bindings are also supported directly by this DLL. They are sampled when the game reads the operator or game buttons, so they do not depend on `mercury_io_poll()` being called:
 
 ```ini
