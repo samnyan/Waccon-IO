@@ -25,17 +25,74 @@ static HWND game_window;
 static HANDLE touch_thread;
 static bool touch_cells[WACCON_IO_TOUCH_CELLS];
 
+static bool cursor_enabled = true;
+static bool wintouch_enabled = true;
+static bool mouse_enabled = true;
+
+static void waccon_load_config(void)
+{
+    cursor_enabled = GetPrivateProfileIntW(L"waccon", L"cursor", 1, L".\\segatools.ini") != 0;
+    wintouch_enabled = GetPrivateProfileIntW(L"waccon", L"wintouch", 1, L".\\segatools.ini") != 0;
+    mouse_enabled = GetPrivateProfileIntW(L"waccon", L"mouse", 1, L".\\segatools.ini") != 0;
+}
+
+static HWND waccon_is_game_window(HWND hwnd)
+{
+    wchar_t class_name[64];
+    DWORD process_id;
+    if (hwnd == NULL || !IsWindowVisible(hwnd) || GetWindow(hwnd, GW_OWNER) != NULL) return NULL;
+    GetWindowThreadProcessId(hwnd, &process_id);
+    if (process_id != GetCurrentProcessId()) return NULL;
+    if (GetClassNameW(hwnd, class_name, _countof(class_name)) > 0 && wcscmp(class_name, L"ConsoleWindowClass") == 0) return NULL;
+    return hwnd;
+}
+
+static BOOL CALLBACK waccon_find_window_callback(HWND hwnd, LPARAM context)
+{
+    HWND *result = (HWND *) context;
+    wchar_t title[128];
+    if (*result != NULL || waccon_is_game_window(hwnd) == NULL) return TRUE;
+    GetWindowTextW(hwnd, title, _countof(title));
+    if (wcsstr(title, L"Mercury") != NULL || wcsstr(title, L"WACCA") != NULL) {
+        *result = hwnd;
+        return FALSE;
+    }
+    if (*result == NULL) *result = hwnd;
+    return TRUE;
+}
+
 static HWND waccon_find_window(void)
 {
     HWND hwnd = FindWindowW(NULL, L"Mercury  ");
     if (hwnd == NULL) hwnd = FindWindowW(NULL, L"WACCA");
+    if (waccon_is_game_window(hwnd) != NULL) return hwnd;
+    hwnd = NULL;
+    EnumWindows(waccon_find_window_callback, (LPARAM) &hwnd);
     return hwnd;
+}
+
+static void waccon_cursor_update(void)
+{
+    CURSORINFO info;
+    HCURSOR cursor;
+    int attempts;
+
+    if (!cursor_enabled) return;
+    info.cbSize = sizeof(info);
+    if (!GetCursorInfo(&info)) return;
+    if ((info.flags & CURSOR_SHOWING) == 0) {
+        for (attempts = 0; attempts < 16 && ShowCursor(TRUE) < 0; attempts++) {
+            /* Balance the game's hidden ShowCursor calls. */
+        }
+    }
+    cursor = LoadCursorW(NULL, MAKEINTRESOURCEW(32512));
+    if (cursor != NULL) SetCursor(cursor);
 }
 
 static void waccon_ensure_touch_window(void)
 {
     RECT rect;
-    if (touch_backend.attached) return;
+    if (touch_backend.attached || !wintouch_enabled) return;
     if (game_window == NULL) game_window = waccon_find_window();
     if (game_window == NULL || !GetClientRect(game_window, &rect)) return;
     touch_mapping.width = rect.right - rect.left;
@@ -67,6 +124,7 @@ HRESULT mercury_io_init(void)
 {
     static LONG initialized;
     if (InterlockedCompareExchange(&initialized, 1, 0) == 0) {
+        waccon_load_config();
         waccon_state_init(&waccon);
         memset(touch_cells, 0, sizeof(touch_cells));
     }
@@ -77,8 +135,9 @@ HRESULT mercury_io_poll(void)
 {
     waccon_state_poll(&waccon);
     waccon_ensure_touch_window();
-    if (touch_backend.attached) waccon_touch_poll(&touch_backend, touch_cells);
-    else if (game_window != NULL) waccon_mouse_poll(game_window, touch_cells);
+    if (touch_backend.attached && wintouch_enabled) waccon_touch_poll(&touch_backend, touch_cells);
+    else if (mouse_enabled && game_window != NULL) waccon_mouse_poll(game_window, touch_cells);
+    if (game_window != NULL) waccon_cursor_update();
     return S_OK;
 }
 

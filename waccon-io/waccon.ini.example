@@ -1,0 +1,7 @@
+[waccon]
+; Force the game cursor visible. Default: 1.
+cursor=1
+; Enable WM_TOUCH input on the current-process game window. Default: 1.
+wintouch=1
+; Enable left-button mouse fallback. Default: 1.
+mouse=1
