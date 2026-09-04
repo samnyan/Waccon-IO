@@ -4,9 +4,25 @@
 
 Phase 1 implements the complete mercuryio API 1.0 surface and a thread-safe minimal state core. Providers are intentionally not included yet; the initial module uses safe neutral defaults so it can be loaded before later input backends are enabled.
 
-## Build with Meson
+## Build with the batch script
 
 From this directory:
+
+```bat
+build.bat build
+build.bat test
+build.bat project
+build.bat clean
+```
+
+The default release artifact is:
+
+```text
+build\waccon_io.dll
+```
+
+The script detects Visual Studio with `vswhere`, initializes the x64 MSVC environment, and uses the Ninja Meson backend. If Meson is not in `PATH`, install it with `python -m pip install meson ninja`.
+
 
 ```powershell
 meson setup build --backend ninja
