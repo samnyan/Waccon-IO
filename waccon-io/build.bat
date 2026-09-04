@@ -102,7 +102,7 @@ exit /b 0
 echo Usage: %~nx0 ^<action^>
 echo.
 echo   build    Configure and build the release DLL with MSVC/Ninja
- echo   test     Build and run the Meson test suite
- echo   project  Generate a Visual Studio 2022 solution without building
- echo   clean    Remove the generated build directory
+echo   test     Build and run the Meson test suite
+echo   project  Generate a Visual Studio 2022 solution without building
+echo   clean    Remove the generated build directory
 exit /b 2

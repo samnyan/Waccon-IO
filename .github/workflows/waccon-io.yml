@@ -1,21 +1,24 @@
-name: waccon-io
+name: waccon
 
 on:
   push:
     paths:
       - 'waccon-io/**'
+      - 'Waccon-Server/**'
       - '.github/workflows/waccon-io.yml'
   pull_request:
     paths:
       - 'waccon-io/**'
+      - 'Waccon-Server/**'
       - '.github/workflows/waccon-io.yml'
 
 jobs:
-  build:
+  waccon-io:
+    name: Build waccon-io
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: Waccon/waccon-io
+        working-directory: waccon-io
     steps:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
@@ -25,8 +28,45 @@ jobs:
       - name: Install Meson and Ninja
         run: python -m pip install meson ninja
       - name: Configure
-        run: meson setup build --backend ninja --buildtype debug
+        run: meson setup build-ci --backend ninja --buildtype release
       - name: Build
-        run: meson compile -C build
+        run: meson compile -C build-ci
       - name: Test
-        run: meson test -C build --print-errorlogs
+        run: meson test -C build-ci --print-errorlogs
+      - name: Upload waccon-io artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: waccon-io-win-x64
+          path: waccon-io/build-ci/waccon_io.dll
+          if-no-files-found: error
+
+  server:
+    name: Build Waccon Server
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Waccon-Server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Waccon-Server/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install web dependencies
+        run: npm ci
+      - name: Web tests
+        run: npm run web:test
+      - name: Web syntax check
+        run: npm run web:check
+      - name: Publish Native AOT Server
+        run: dotnet publish Waccon.Server.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishAot=true --output publish/win-x64
+      - name: Upload Waccon Server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: waccon-server-win-x64
+          path: Waccon-Server/publish/win-x64
+          if-no-files-found: error
