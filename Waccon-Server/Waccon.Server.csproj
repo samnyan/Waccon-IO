@@ -15,4 +15,22 @@
   <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="BuildWebController" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="npm run web:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+  <Target Name="CopyWebControllerToOutput" AfterTargets="Build" DependsOnTargets="BuildWebController">
+    <ItemGroup>
+      <_WacconWebFiles Include="$(MSBuildProjectDirectory)\web-dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WacconWebFiles)" DestinationFiles="@(_WacconWebFiles->'$(OutDir)web\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="IncludeWebControllerInPublish" AfterTargets="ComputeFilesToPublish" DependsOnTargets="BuildWebController">
+    <ItemGroup>
+      <_WacconPublishedWebFiles Include="$(MSBuildProjectDirectory)\web-dist\**\*" />
+      <ResolvedFileToPublish Include="@(_WacconPublishedWebFiles)">
+        <RelativePath>web\%(_WacconPublishedWebFiles.RecursiveDir)%(_WacconPublishedWebFiles.Filename)%(_WacconPublishedWebFiles.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

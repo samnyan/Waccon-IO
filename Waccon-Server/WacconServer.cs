@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Buffers.Binary;
 
 namespace Waccon.Server;
 
@@ -9,7 +10,10 @@ public sealed class WacconServer : IAsyncDisposable
     private readonly ServerOptions _options;
     private readonly SharedMemoryBridge _bridge;
     private readonly TcpListener _listener;
+    private readonly WacconWebServer _webServer;
     private readonly CancellationTokenSource _stop = new();
+    private readonly object _inputDebugLock = new();
+    private byte[]? _lastDebugInput;
     private int _clientCount;
 
     /// <summary>Creates a server with validated options.</summary>
@@ -18,6 +22,7 @@ public sealed class WacconServer : IAsyncDisposable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _bridge = new SharedMemoryBridge(options.SharedMemoryName);
         _listener = new TcpListener(IPAddress.Parse(options.ListenAddress), options.TcpPort);
+        _webServer = new WacconWebServer(options, _bridge, TryReserveClient, ReleaseClient, PublishInput, ClearInput);
     }
 
     /// <summary>Accepts clients until cancellation.</summary>
@@ -25,18 +30,24 @@ public sealed class WacconServer : IAsyncDisposable
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
         _listener.Start();
+        var webTask = _webServer.RunAsync(linked.Token);
+        if (webTask.IsFaulted) await webTask.ConfigureAwait(false);
+        var diagnosticsTask = MonitorSharedMemoryAsync(linked.Token);
         try {
             while (!linked.IsCancellationRequested) {
                 var client = await _listener.AcceptTcpClientAsync(linked.Token).ConfigureAwait(false);
-                if (Interlocked.Increment(ref _clientCount) > _options.MaxClients) {
-                    Interlocked.Decrement(ref _clientCount);
+                if (!TryReserveClient()) {
                     client.Dispose();
                     continue;
                 }
                 _ = HandleClientAsync(client, linked.Token);
             }
         } catch (OperationCanceledException) when (linked.IsCancellationRequested) { }
-        finally { _listener.Stop(); }
+        finally {
+            linked.Cancel();
+            _listener.Stop();
+            try { await diagnosticsTask.ConfigureAwait(false); } catch (OperationCanceledException) { }
+        }
     }
 
     /// <inheritdoc />
@@ -44,6 +55,7 @@ public sealed class WacconServer : IAsyncDisposable
     {
         _stop.Cancel();
         _listener.Stop();
+        _webServer.Dispose();
         _bridge.Dispose();
         await ValueTask.CompletedTask;
         _stop.Dispose();
@@ -57,7 +69,7 @@ public sealed class WacconServer : IAsyncDisposable
             try {
                 var hello = await WconProtocol.ReadAsync(stream, _options.MaxPayloadBytes, serverToken).ConfigureAwait(false);
                 if (hello is null || hello.Value.Type != MessageType.Hello || !Authorized(hello.Value.Payload)) return;
-                await stream.WriteAsync(WconProtocol.Frame(MessageType.Welcome, 0, "Waccon"u8), serverToken).ConfigureAwait(false);
+                await stream.WriteAsync(WconProtocol.Frame(MessageType.Welcome, 0, _bridge.GetWelcomePayload()), serverToken).ConfigureAwait(false);
                 using var clientStop = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
                 var ledTask = SendLedUpdatesAsync(stream, clientStop.Token);
                 while (!clientStop.IsCancellationRequested) {
@@ -65,10 +77,10 @@ public sealed class WacconServer : IAsyncDisposable
                     if (packet is null) break;
                     switch (packet.Value.Type) {
                         case MessageType.InputSnapshot:
-                            _bridge.PublishInput(packet.Value.Payload, _options.LeaseTimeoutMs);
+                            PublishInput(packet.Value.Payload);
                             break;
                         case MessageType.ClearInput:
-                            _bridge.ClearInput();
+                            ClearInput();
                             break;
                         case MessageType.Ping:
                             await stream.WriteAsync(WconProtocol.Frame(MessageType.Pong, packet.Value.Sequence, packet.Value.Payload), clientStop.Token).ConfigureAwait(false);
@@ -81,8 +93,8 @@ public sealed class WacconServer : IAsyncDisposable
             catch (IOException) { }
             catch (SocketException) { }
             finally {
-                _bridge.ClearInput();
-                Interlocked.Decrement(ref _clientCount);
+                ClearInput();
+                ReleaseClient();
             }
         }
     }
@@ -105,5 +117,65 @@ public sealed class WacconServer : IAsyncDisposable
     {
         if (_options.AuthToken.Length == 0) return true;
         return payload.SequenceEqual(System.Text.Encoding.UTF8.GetBytes(_options.AuthToken));
+    }
+
+    private bool TryReserveClient()
+    {
+        if (Interlocked.Increment(ref _clientCount) <= _options.MaxClients) return true;
+        Interlocked.Decrement(ref _clientCount);
+        return false;
+    }
+
+    private void ReleaseClient() => Interlocked.Decrement(ref _clientCount);
+
+    private void PublishInput(byte[] payload)
+    {
+        _bridge.PublishInput(payload, _options.LeaseTimeoutMs);
+        if (!_options.DebugInput) return;
+
+        var snapshot = payload.AsSpan(0, 242).ToArray();
+        lock (_inputDebugLock) {
+            if (_lastDebugInput is not null && snapshot.AsSpan().SequenceEqual(_lastDebugInput)) return;
+            _lastDebugInput = snapshot;
+            var sourceId = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(WconProtocol.SourceIdOffset));
+            Console.WriteLine($"[input] source={sourceId} activeCells={FormatActiveCells(snapshot)}");
+        }
+    }
+
+    private void ClearInput()
+    {
+        _bridge.ClearInput();
+        if (!_options.DebugInput) return;
+
+        lock (_inputDebugLock) {
+            if (_lastDebugInput is not null && _lastDebugInput.AsSpan(2).IndexOfAnyExcept((byte)0) < 0) return;
+            _lastDebugInput = new byte[242];
+            Console.WriteLine("[input] activeCells=<none>");
+        }
+    }
+
+    private static string FormatActiveCells(ReadOnlySpan<byte> snapshot)
+    {
+        var cells = new List<int>();
+        for (var cell = 0; cell < WconProtocol.TouchCellCount; cell++) {
+            if (snapshot[WconProtocol.TouchCellOffset + cell] != 0) cells.Add(cell);
+        }
+        return cells.Count == 0 ? "<none>" : string.Join(',', cells);
+    }
+
+    private async Task MonitorSharedMemoryAsync(CancellationToken token)
+    {
+        bool? wasConnected = null;
+        while (!token.IsCancellationRequested) {
+            _bridge.Heartbeat();
+            var status = _bridge.GetStatus();
+            if (wasConnected != status.IoConnected) {
+                Console.WriteLine(status.IoConnected
+                    ? $"waccon-io connected (pid {status.IoProcessId}, input sequence {status.IoInputSequence})."
+                    : "waccon-io not detected; waiting for a compatible DLL to enter mercury_io_poll().");
+                wasConnected = status.IoConnected;
+            }
+            await Task.Delay(1000, token).ConfigureAwait(false);
+        }
     }
 }

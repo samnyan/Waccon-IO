@@ -7,4 +7,5 @@ Development currently starts with `waccon-io`, an ABI-compatible custom mercuryi
 ## Repository layout
 
 - `waccon-io/` — custom mercuryio module and tests.
+- `Waccon-Server/` — Native AOT C# bridge, TCP WCON endpoint, and localhost WebSocket controller.
 - `docs/` — Usage documents.

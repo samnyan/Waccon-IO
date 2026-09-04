@@ -3,6 +3,8 @@
 /out/
 **/bin/
 **/obj/
+**/node_modules/
+Waccon-Server/web-dist/
 *.user
 *.suo
 *.VC.db

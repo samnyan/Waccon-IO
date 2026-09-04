@@ -1,0 +1,13 @@
+{
+  "name": "waccon-server-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "web:build": "vite build",
+    "web:test": "node web/controller-core.test.mjs",
+    "web:check": "node --check web/controller.js"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2"
+  }
+}

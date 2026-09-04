@@ -17,6 +17,12 @@ public static class WconProtocol
     public const ushort Version = 0x0100;
     /// <summary>Input payload size.</summary>
     public const int InputPayloadSize = 2 + 240 + 4 + 8 + 8;
+    /// <summary>First touch-cell byte in an input payload.</summary>
+    public const int TouchCellOffset = 2;
+    /// <summary>Touch-cell count in an input payload.</summary>
+    public const int TouchCellCount = 240;
+    /// <summary>Source identifier offset in an input payload.</summary>
+    public const int SourceIdOffset = TouchCellOffset + TouchCellCount;
 
     /// <summary>Creates a framed WCON packet.</summary>
     public static byte[] Frame(MessageType type, uint sequence, ReadOnlySpan<byte> payload)
@@ -44,6 +50,18 @@ public static class WconProtocol
         var payload = new byte[length];
         if (!await ReadExactlyAsync(stream, payload, cancellationToken).ConfigureAwait(false)) return null;
         return ((MessageType)BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(6)), BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(12)), payload);
+    }
+
+    /// <summary>Parses one complete WCON packet carried by a message transport.</summary>
+    public static (MessageType Type, uint Sequence, byte[] Payload) ParseFrame(ReadOnlySpan<byte> frame, int maxPayload)
+    {
+        if (frame.Length < HeaderSize) throw new InvalidDataException("Truncated WCON header.");
+        if (!frame.Slice(0, 4).SequenceEqual("WCON"u8)) throw new InvalidDataException("Invalid WCON magic.");
+        if (BinaryPrimitives.ReadUInt16LittleEndian(frame.Slice(4)) != Version) throw new InvalidDataException("Unsupported WCON version.");
+        var length = BinaryPrimitives.ReadUInt32LittleEndian(frame.Slice(8));
+        if (length > maxPayload) throw new InvalidDataException("WCON payload exceeds configured limit.");
+        if (length != frame.Length - HeaderSize) throw new InvalidDataException("WCON frame length does not match its payload.");
+        return ((MessageType)BinaryPrimitives.ReadUInt16LittleEndian(frame.Slice(6)), BinaryPrimitives.ReadUInt32LittleEndian(frame.Slice(12)), frame[HeaderSize..].ToArray());
     }
 
     private static async ValueTask<bool> ReadExactlyAsync(Stream stream, Memory<byte> buffer, CancellationToken token)

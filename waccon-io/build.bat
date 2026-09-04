@@ -28,9 +28,9 @@ if errorlevel 1 (
 )
 
 if exist "%BUILD_DIR%" (
-    "%MESON%" setup "%BUILD_DIR%" --backend "%MESON_BACKEND%" --buildtype "%BUILD_TYPE%" --reconfigure
+    "%MESON%" setup "%BUILD_DIR%" "%SCRIPT_DIR%." --backend "%MESON_BACKEND%" --buildtype "%BUILD_TYPE%" --reconfigure
 ) else (
-    "%MESON%" setup "%BUILD_DIR%" --backend "%MESON_BACKEND%" --buildtype "%BUILD_TYPE%"
+    "%MESON%" setup "%BUILD_DIR%" "%SCRIPT_DIR%." --backend "%MESON_BACKEND%" --buildtype "%BUILD_TYPE%"
 )
 if errorlevel 1 exit /b 1
 

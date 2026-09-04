@@ -28,8 +28,15 @@ int main(void)
 
     assert(sizeof(struct waccon_shm_input) == 262);
     assert(sizeof(struct waccon_shm_output) == 1932);
+    assert(sizeof(struct waccon_shm_endpoint) == 32);
+    assert(sizeof(struct waccon_shm) == 2282);
 
     waccon_state_init(&state);
+    if (state.shm != NULL) {
+        assert(state.shm->io.process_id == GetCurrentProcessId());
+        assert(state.shm->io.protocol_major == WACCON_SHM_MAJOR);
+        assert(state.shm->io.protocol_minor == WACCON_SHM_MINOR);
+    }
     waccon_state_set_buttons(&state, 0x05, 0x03);
     waccon_state_get_buttons(&state, &opbtn, &gamebtn);
     assert(opbtn == 0x05);
@@ -60,7 +67,6 @@ int main(void)
     assert(waccon_touch_mapping_cell(&mapping, 0.9f, 0.5f) == 75);
     assert(waccon_touch_mapping_cell(&mapping, 0.1f, 0.5f) == 195);
     assert(waccon_touch_mapping_cell(&mapping, 0.5f, 0.1f) == -1);
-
 
     assert(GetTempPathW(_countof(temporary_path), temporary_path) > 0);
     assert(GetTempFileNameW(temporary_path, L"wcc", 0, temporary_path) != 0);

@@ -19,6 +19,8 @@ struct waccon_state {
     struct waccon_shm_input input;
     struct waccon_shm_output output;
     uint64_t input_deadline_ms;
+    uint64_t started_ms;
+    uint32_t last_input_sequence;
     HANDLE shm_mapping;
     struct waccon_shm *shm;
 };

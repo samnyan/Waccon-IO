@@ -9,6 +9,8 @@ public sealed record ServerOptions
     public string ListenAddress { get; init; } = "127.0.0.1";
     /// <summary>TCP listening port.</summary>
     public int TcpPort { get; init; } = 52468;
+    /// <summary>HTTP and WebSocket listening port.</summary>
+    public int WebPort { get; init; } = 52469;
     /// <summary>Maximum simultaneous clients.</summary>
     public int MaxClients { get; init; } = 4;
     /// <summary>Input lease timeout in milliseconds.</summary>
@@ -17,6 +19,8 @@ public sealed record ServerOptions
     public int MaxPayloadBytes { get; init; } = 4096;
     /// <summary>Optional shared authentication token.</summary>
     public string AuthToken { get; init; } = "";
+    /// <summary>Writes changed network touch-cell sets to the server console.</summary>
+    public bool DebugInput { get; init; }
     /// <summary>Named Windows mapping shared with waccon-io.</summary>
     public string SharedMemoryName { get; init; } = "Local\\WACCON_SHARED_BUFFER";
 
@@ -30,6 +34,7 @@ public sealed record ServerOptions
         var value = root.Server ?? new();
         var shm = root.SharedMemory?.Name ?? "Local\\WACCON_SHARED_BUFFER";
         if (value.TcpPort is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(TcpPort));
+        if (value.WebPort is < 1 or > 65535 || value.WebPort == value.TcpPort) throw new ArgumentOutOfRangeException(nameof(WebPort));
         if (value.MaxClients is < 1 or > 64) throw new ArgumentOutOfRangeException(nameof(MaxClients));
         if (value.LeaseTimeoutMs is < 50 or > 60000) throw new ArgumentOutOfRangeException(nameof(LeaseTimeoutMs));
         if (value.MaxPayloadBytes is < 32 or > 1048576) throw new ArgumentOutOfRangeException(nameof(MaxPayloadBytes));
