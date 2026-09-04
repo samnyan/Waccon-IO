@@ -97,15 +97,23 @@ static void waccon_cursor_update(void)
 {
     CURSORINFO info;
     HCURSOR cursor;
-    int attempts;
+    int old_show_count = -1;
+    int attempts = 0;
+    int show_count = -1;
 
     if (!cursor_enabled) return;
     info.cbSize = sizeof(info);
-    if (!GetCursorInfo(&info)) return;
+    if (!GetCursorInfo(&info)) {
+        waccon_log("cursor GetCursorInfo failed error=%lu\n", GetLastError());
+        return;
+    }
     if ((info.flags & CURSOR_SHOWING) == 0) {
-        for (attempts = 0; attempts < 16 && ShowCursor(TRUE) < 0; attempts++) {
-            /* Balance the game's hidden ShowCursor calls. */
+        for (attempts = 0; attempts < 16; attempts++) {
+            old_show_count = show_count;
+            show_count = ShowCursor(TRUE);
+            if (show_count >= 0) break;
         }
+        waccon_log("cursor was hidden, ShowCursor(TRUE) old=%d new=%d attempts=%d\n", old_show_count, show_count, attempts + 1);
     }
     cursor = LoadCursorW(NULL, MAKEINTRESOURCEW(32512));
     if (cursor != NULL) SetCursor(cursor);
@@ -175,11 +183,11 @@ HRESULT mercury_io_poll(void)
     if (touch_backend.attached && wintouch_enabled) {
         bool local_cells[WACCON_IO_TOUCH_CELLS];
         size_t i;
-        memset(local_cells, 0, sizeof(local_cells));
         waccon_touch_poll(&touch_backend, local_cells);
         for (i = 0; i < WACCON_IO_TOUCH_CELLS; i++) touch_cells[i] = touch_cells[i] || local_cells[i];
+    } else if (mouse_enabled && game_window != NULL) {
+        waccon_mouse_poll(game_window, touch_cells);
     }
-    else if (mouse_enabled && game_window != NULL) waccon_mouse_poll(game_window, touch_cells);
     if (game_window != NULL) waccon_cursor_update();
     if (now - last_log >= 1000) {
         waccon_log("poll alive hwnd=%p wintouch_attached=%d cursor=%d\n", game_window, touch_backend.attached, cursor_enabled);

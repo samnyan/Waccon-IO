@@ -59,8 +59,17 @@ void waccon_log(const char *format, ...)
     if (length < 0) return;
 
     EnterCriticalSection(&log_lock);
-    fputs(line, stderr);
-    fflush(stderr);
-    OutputDebugStringA(line);
+    if (console_ready) {
+        DWORD written;
+        WriteConsoleA(GetStdHandle(STD_ERROR_HANDLE), line, (DWORD)length, &written, NULL);
+    } else {
+        OutputDebugStringA(line);
+    }
     LeaveCriticalSection(&log_lock);
+}
+
+void waccon_log_window_event(const char *event, HWND hwnd, UINT message, int x, int y)
+{
+    waccon_log("window-hook event=%s hwnd=%p msg=0x%04X client=(%d,%d)\n",
+        event != NULL ? event : "unknown", hwnd, message, x, y);
 }

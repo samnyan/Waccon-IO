@@ -67,6 +67,7 @@ static void waccon_touch_update(const TOUCHINPUT *input)
     point.x = input->x / 100;
     point.y = input->y / 100;
     ScreenToClient(active_backend->hwnd, &point);
+    waccon_log_window_event("touch-contact", active_backend->hwnd, WM_TOUCH, point.x, point.y);
     waccon_log("WM_TOUCH id=%lu flags=0x%lx client=(%ld,%ld)\n", input->dwID, input->dwFlags, point.x, point.y);
     EnterCriticalSection(&active_backend->lock);
     for (i = 0; i < active_backend->contact_count; i++) {
@@ -99,6 +100,7 @@ LRESULT CALLBACK waccon_touch_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM
 {
     if (msg == WM_TOUCH && active_backend != NULL && active_backend->attached) {
         UINT count = LOWORD(wparam);
+        waccon_log_window_event("WM_TOUCH", hwnd, msg, -1, -1);
         PTOUCHINPUT inputs = malloc(sizeof(TOUCHINPUT) * count);
         if (inputs != NULL) {
             if (GetTouchInputInfo((HTOUCHINPUT)lparam, count, inputs, sizeof(TOUCHINPUT))) {
@@ -129,7 +131,11 @@ HRESULT waccon_touch_attach(struct waccon_touch_backend *backend, HWND hwnd, con
         return HRESULT_FROM_WIN32(GetLastError());
     }
     backend->original_wndproc = (WNDPROC)GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
-    if (backend->original_wndproc == NULL) return HRESULT_FROM_WIN32(GetLastError());
+    if (backend->original_wndproc == NULL) {
+        waccon_log("GetWindowLongPtrW(GWLP_WNDPROC) failed error=%lu\n", GetLastError());
+        UnregisterTouchWindow(hwnd);
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
     SetLastError(ERROR_SUCCESS);
     if (SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)waccon_touch_wndproc) == 0 && GetLastError() != ERROR_SUCCESS) {
         UnregisterTouchWindow(hwnd);
@@ -137,6 +143,7 @@ HRESULT waccon_touch_attach(struct waccon_touch_backend *backend, HWND hwnd, con
     }
     backend->attached = true;
     active_backend = backend;
+    waccon_log("window-hook installed hwnd=%p original_wndproc=%p\n", hwnd, backend->original_wndproc);
     return S_OK;
 }
 
@@ -148,6 +155,7 @@ void waccon_touch_detach(struct waccon_touch_backend *backend)
     UnregisterTouchWindow(backend->hwnd);
     backend->attached = false;
     if (active_backend == backend) active_backend = NULL;
+    waccon_log("window-hook removed hwnd=%p\n", backend->hwnd);
     DeleteCriticalSection(&backend->lock);
 }
 
@@ -155,6 +163,7 @@ void waccon_mouse_poll(HWND hwnd, bool cells[240])
 {
     POINT point;
     RECT rect;
+    memset(cells, 0, sizeof(bool) * 240);
     if (hwnd == NULL || GetForegroundWindow() != hwnd) return;
     if (!GetCursorPos(&point) || !ScreenToClient(hwnd, &point)) return;
     if (!GetClientRect(hwnd, &rect)) return;
@@ -162,12 +171,14 @@ void waccon_mouse_poll(HWND hwnd, bool cells[240])
     active_mapping.width = rect.right - rect.left;
     active_mapping.height = rect.bottom - rect.top;
     if (active_mapping.width <= 0 || active_mapping.height <= 0) return;
-    point.x = (LONG)((float)point.x / active_mapping.width * active_mapping.width);
-    point.y = (LONG)((float)point.y / active_mapping.height * active_mapping.height);
     {
-        int cell = waccon_touch_mapping_cell(&active_mapping,
-            (float)point.x / active_mapping.width,
-            (float)point.y / active_mapping.height);
+        int cell;
+        float normalized_x = (float)point.x / active_mapping.width;
+        float normalized_y = (float)point.y / active_mapping.height;
+        cell = waccon_touch_mapping_cell(&active_mapping, normalized_x, normalized_y);
+        waccon_log_window_event("mouse-left", hwnd, WM_LBUTTONDOWN, point.x, point.y);
+        waccon_log("mouse normalized=(%.3f,%.3f) cell=%d client=%ldx%ld\n",
+            normalized_x, normalized_y, cell, active_mapping.width, active_mapping.height);
         if (cell >= 0) cells[cell] = true;
     }
 }
